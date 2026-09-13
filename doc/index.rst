@@ -18,3 +18,4 @@ connected by real or virtual controllers.
    options
    requirements
    api
+   releases

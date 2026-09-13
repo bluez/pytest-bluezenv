@@ -1,0 +1,4 @@
+Releases
+========
+
+.. include:: ../CHANGES.rst
