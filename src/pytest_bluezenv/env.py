@@ -486,10 +486,9 @@ def _start_chronyd():
 
 
 def _reset_vm_instance():
-    # Power cycle controller to reset it between tests
+    # Power controller off to reset and match state at boot
     btmgmt = utils.find_exe("tools", "btmgmt")
     run([btmgmt, "power", "off"], check=True)
-    run([btmgmt, "power", "on"], check=True)
 
 
 def _main_runner():
