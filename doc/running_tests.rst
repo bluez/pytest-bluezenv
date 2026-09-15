@@ -93,6 +93,24 @@ Run all tests using the USB controllers:
 
 	$ python3 -mpytest --usb=hci0,hci1 --force-usb
 
+Redirect PCIe devices
+---------------------
+
+.. code-block::
+
+	$ sudo python3 -mpytest --pcie=hci0,hci1
+
+Unlike USB controllers, a PCIe controller is bound to vfio-pci for the
+time a VM host uses it, and is bound back to its own driver afterwards,
+so the tests have to be run as root. The IOMMU also has to be enabled,
+and the controller has to be alone in its IOMMU group.
+
+Run all tests using the PCIe controllers:
+
+.. code-block::
+
+	$ sudo python3 -mpytest --pcie=hci0,hci1 --force-pcie
+
 Run tests in parallel
 ---------------------
 

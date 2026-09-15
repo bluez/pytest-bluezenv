@@ -33,6 +33,7 @@ __all__ = [
     # fixtures:
     "kernel",
     "usb_indices",
+    "pcie_indices",
     "host_setup",
     "vm_setup",
     "vm",
@@ -84,6 +85,18 @@ def pytest_addoption(parser):
         action="store_true",
         default=None,
         help=("Force tests to run with USB controllers instead of btvirt"),
+    )
+    group.addoption(
+        "--pcie",
+        action="store",
+        default=None,
+        help=("PCIe HCI devices to use, e.g. 'hci0,hci1'"),
+    )
+    group.addoption(
+        "--force-pcie",
+        action="store_true",
+        default=None,
+        help=("Force tests to run with PCIe controllers instead of btvirt"),
     )
     group.addoption(
         "--bluez-build-dir",
@@ -440,6 +453,40 @@ def kernel(pytestconfig):
     return kernel
 
 
+def _controller_indices(pytestconfig, option, bus):
+    """
+    Controllers on the given bus that can be passed through to a VM host.
+
+    Yields:
+        indices: list of controller names (hci0, hci1, ...)
+        messages: error messages associated with each
+    """
+    indices = pytestconfig.getoption(option)
+
+    if indices is None:
+        indices = os.environ.get("FUNCTIONAL_TESTING_CONTROLLERS")
+
+    if indices is None:
+        indices = [item.name for item in Path("/sys/class/bluetooth").iterdir()]
+    else:
+        indices = indices.replace(",", " ").split()
+
+    messages = []
+    for name in list(indices):
+        if env.Environment.controller_bus(name) != bus:
+            indices.remove(name)
+            continue
+
+        try:
+            env.Environment.check_controller(name)
+            messages.append("")
+        except ValueError as exc:
+            indices.remove(name)
+            messages.append(str(exc))
+
+    return indices, messages
+
+
 @pytest.fixture(scope="session")
 def usb_indices(pytestconfig):
     """
@@ -449,31 +496,19 @@ def usb_indices(pytestconfig):
         usb_indices: list of usb controller names (hci0, hci1, ...)
         messages: error messages associated with each
     """
-    usb_indices = pytestconfig.getoption("usb")
+    return _controller_indices(pytestconfig, "usb", "usb")
 
-    if usb_indices is None:
-        usb_indices = os.environ.get("FUNCTIONAL_TESTING_CONTROLLERS")
 
-    if usb_indices is None:
-        usb_indices = [item.name for item in Path("/sys/class/bluetooth").iterdir()]
-    else:
-        usb_indices = usb_indices.replace(",", " ").split()
+@pytest.fixture(scope="session")
+def pcie_indices(pytestconfig):
+    """
+    Fixture for available HW PCIe controllers. Skips tests if not available.
 
-    messages = []
-    for name in list(usb_indices):
-        subsys = Path("/sys/class/bluetooth") / name / "device" / "subsystem"
-        if subsys.resolve() != Path("/sys/bus/usb"):
-            usb_indices.remove(name)
-            continue
-
-        try:
-            env.Environment.check_controller(name)
-            messages.append("")
-        except ValueError as exc:
-            usb_indices.remove(name)
-            messages.append(str(exc))
-
-    return usb_indices, messages
+    Yields:
+        pcie_indices: list of pcie controller names (hci0, hci1, ...)
+        messages: error messages associated with each
+    """
+    return _controller_indices(pytestconfig, "pcie", "pci")
 
 
 @pytest.fixture(scope="session")
@@ -533,18 +568,24 @@ def _vm_impl(request, kernel, num_hosts, hw, mem, controller):
         pytest.skip(reason=err)
         return
 
-    if hw or config.option.force_usb:
-        usb_indices, messages = request.getfixturevalue("usb_indices")
-        if len(usb_indices) < num_hosts:
+    if hw or config.option.force_usb or config.option.force_pcie:
+        if config.option.pcie or config.option.force_pcie:
+            fixture, kind = "pcie_indices", "PCIe"
+        else:
+            fixture, kind = "usb_indices", "USB"
+
+        hw_indices, messages = request.getfixturevalue(fixture)
+        if len(hw_indices) < num_hosts:
             message = "\n".join(m for m in messages[:num_hosts] if m)
-            pytest.skip(reason=f"Not enough USB controllers: {message}")
+            reason = f"Not enough {kind} controllers"
+            pytest.skip(reason=f"{reason}: {message}" if message else reason)
     else:
-        usb_indices = None
+        hw_indices = None
 
     with env.Environment(
         kernel,
         num_hosts,
-        usb_indices=usb_indices,
+        hw_indices=hw_indices,
         mem=mem,
         controller=controller,
         timeout=utils.DEFAULT_TIMEOUT,
