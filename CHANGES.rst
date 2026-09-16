@@ -1,6 +1,9 @@
 Development:
    - *(Backward incompatible)* Power controller off before tests.
      Tests not using bluetoothd must now power it on explicitly.
+   - *(Backward incompatible)* Rename ``usb_indices`` fixture to
+     ``hw_indices``.
+   - Add PCIe controller passthrough with --pcie and --force-pcie.
 
 v0.1.9:
    - Add configurable default VM memory with --vm-mem.

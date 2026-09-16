@@ -82,7 +82,7 @@ Internal fixtures:
 
    pytest_bluezenv.host_setup
    pytest_bluezenv.kernel
-   pytest_bluezenv.usb_indices
+   pytest_bluezenv.hw_indices
    pytest_bluezenv.vm
    pytest_bluezenv.vm_once
    pytest_bluezenv.vm_setup

@@ -545,7 +545,7 @@ class Environment:
     DEFAULT_MEM = None
 
     def __init__(
-        self, kernel, num_hosts, usb_indices=None, timeout=20, mem=None, controller=True
+        self, kernel, num_hosts, hw_indices=None, timeout=20, mem=None, controller=True
     ):
         if Path(kernel).is_dir():
             self.kernel = str(Path(kernel) / "arch" / "x86" / "boot" / "bzImage")
@@ -565,13 +565,14 @@ class Environment:
         self.mem = mem
         self.controller = controller
 
-        if usb_indices is None:
-            self.usb_indices = None
-        elif usb_indices is not None and self.num_hosts <= len(usb_indices):
-            self.usb_indices = tuple(usb_indices)
+        if hw_indices is None:
+            self.hw_indices = None
+        elif hw_indices is not None and self.num_hosts <= len(hw_indices):
+            self.hw_indices = tuple(hw_indices)
         else:
             raise ValueError(
-                "USB redirection enabled, but not enough controllers for each host"
+                "Controller passthrough enabled, but not enough controllers"
+                " for each host"
             )
 
         if sys.version_info >= (3, 12):
@@ -584,10 +585,10 @@ class Environment:
         self.path = Path(tempfile.mkdtemp(prefix="pytest-bluezenv-"))
 
         if self.controller:
-            if self.usb_indices is None:
+            if self.hw_indices is None:
                 args = self._start_btvirt()
             else:
-                args = self._start_usb()
+                args = self._start_hw()
         else:
             args = [[]] * self.num_hosts
 
@@ -697,11 +698,44 @@ class Environment:
         return [[f"-u{socket}"]] * self.num_hosts
 
     @classmethod
-    def check_controller(cls, name):
-        subsys = Path("/sys/class/bluetooth") / name / "device" / "subsystem"
-        if subsys.resolve() != Path("/sys/bus/usb"):
-            raise ValueError(f"{devname} is not an USB device")
+    def controller_bus(cls, name):
+        """
+        Bus a controller is attached to.
 
+        Returns:
+            bus: "usb", "pci", or None if it is on neither of them
+        """
+        subsys = Path("/sys/class/bluetooth") / name / "device" / "subsystem"
+
+        try:
+            bus = subsys.resolve().name
+        except OSError:
+            return None
+
+        return bus if bus in ("usb", "pci") else None
+
+    @classmethod
+    def check_controller(cls, name):
+        """
+        Check a controller can be passed through to a VM host.
+
+        Returns:
+            args: test-runner arguments passing the controller through
+
+        Raises:
+            ValueError: it cannot be passed through, telling why
+        """
+        bus = cls.controller_bus(name)
+
+        if bus == "usb":
+            return cls._check_usb_controller(name)
+        elif bus == "pci":
+            return cls._check_pcie_controller(name)
+
+        raise ValueError(f"{name} is not an USB or a PCIe device")
+
+    @classmethod
+    def _check_usb_controller(cls, name):
         devpath = Path(f"/sys/class/bluetooth/{name}/device/../")
         with open(devpath / "busnum", "r") as f:
             busnum = "{:03}".format(int(f.read().strip()))
@@ -724,14 +758,34 @@ class Environment:
             )
             raise ValueError(message)
 
-        return busnum, devnum
+        return ["-U", f"usb-host,hostbus={busnum},hostaddr={devnum}"]
 
-    def _start_usb(self):
+    @classmethod
+    def _check_pcie_controller(cls, name):
+        device = Path(f"/sys/class/bluetooth/{name}/device").resolve()
+        bdf = device.name
+
+        # The device is bound to vfio-pci for the time a VM host uses it,
+        # which is only allowed for the superuser
+        if os.geteuid() != 0:
+            raise ValueError(
+                f"error: passing {name} ({bdf}) through to a VM host binds it"
+                f" to vfio-pci, which requires running the tests as root"
+            )
+
+        if not (device / "iommu_group").exists():
+            raise ValueError(
+                f"error: {name} ({bdf}) has no IOMMU group, enable the IOMMU"
+                f" to pass it through to a VM host"
+            )
+
+        return ["-P", f"vfio-pci,host={bdf}"]
+
+    def _start_hw(self):
         args = []
 
-        for index in self.usb_indices[: self.num_hosts]:
-            busnum, devnum = self.check_controller(index)
-            args.append(["-U", f"usb-host,hostbus={busnum},hostaddr={devnum}"])
+        for index in self.hw_indices[: self.num_hosts]:
+            args.append(self.check_controller(index))
 
         return args
 

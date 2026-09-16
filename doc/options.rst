@@ -22,6 +22,20 @@ The `pytest-bluezenv` plugin adds the following command-line options:
 ``--force-usb``
         Force tests to use USB controllers instead of `btvirt`.
 
+``--pcie=hci0,hci1``
+        PCIe controllers to use in tests that require use of
+	real controllers.
+
+	If not provided, value from `FUNCTIONAL_TESTING_CONTROLLERS`
+	environment variable is used. If none, all PCIe controllers
+	are considered.
+
+	Passing a PCIe controller through binds it to vfio-pci for
+	the time a VM host uses it, which requires running as root.
+
+``--force-pcie``
+        Force tests to use PCIe controllers instead of `btvirt`.
+
 ``--bluez-build-dir=<path>``
         Path to build directory where to search for BlueZ
         executables.
