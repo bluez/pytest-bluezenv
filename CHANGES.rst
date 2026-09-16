@@ -1,10 +1,8 @@
 Development:
    - *(Backward incompatible)* Power controller off before tests.
      Tests not using bluetoothd must now power it on explicitly.
-   - *(Backward incompatible)* ``Environment`` takes the controllers to
-     pass through as ``hw_indices`` instead of ``usb_indices``, and
-     ``check_controller()`` returns the test-runner arguments for a
-     controller instead of its USB bus and device numbers.
+   - *(Backward incompatible)* Rename ``usb_indices`` fixture to
+     ``hw_indices``.
    - Add PCIe controller passthrough with --pcie and --force-pcie.
 
 v0.1.9:

@@ -32,8 +32,7 @@ __all__ = [
     "pytest_runtest_logfinish",
     # fixtures:
     "kernel",
-    "usb_indices",
-    "pcie_indices",
+    "hw_indices",
     "host_setup",
     "vm_setup",
     "vm",
@@ -453,14 +452,11 @@ def kernel(pytestconfig):
     return kernel
 
 
-def _controller_indices(pytestconfig, option, bus):
+def _controller_indices(pytestconfig, option):
     """
     Controllers on the given bus that can be passed through to a VM host.
-
-    Yields:
-        indices: list of controller names (hci0, hci1, ...)
-        messages: error messages associated with each
     """
+    bus = {"usb": "usb", "pcie": "pci"}[option]
     indices = pytestconfig.getoption(option)
 
     if indices is None:
@@ -488,7 +484,7 @@ def _controller_indices(pytestconfig, option, bus):
 
 
 @pytest.fixture(scope="session")
-def usb_indices(pytestconfig):
+def hw_indices(pytestconfig):
     """
     Fixture for available HW USB controllers. Skips tests if not available.
 
@@ -496,19 +492,27 @@ def usb_indices(pytestconfig):
         usb_indices: list of usb controller names (hci0, hci1, ...)
         messages: error messages associated with each
     """
-    return _controller_indices(pytestconfig, "usb", "usb")
+    kinds = []
 
+    # If command line option given, use only that kind
+    if pytestconfig.getoption("pcie") or pytestconfig.getoption("force_pcie"):
+        kinds.append("pcie")
+    if pytestconfig.getoption("usb") or pytestconfig.getoption("force_usb"):
+        kinds.append("usb")
+    if not kinds:
+        kinds = ["usb", "pcie"]
 
-@pytest.fixture(scope="session")
-def pcie_indices(pytestconfig):
-    """
-    Fixture for available HW PCIe controllers. Skips tests if not available.
+    indices = []
+    messages = []
+    for kind in kinds:
+        ind, msg = _controller_indices(pytestconfig, kind)
+        indices += ind
+        messages += msg
 
-    Yields:
-        pcie_indices: list of pcie controller names (hci0, hci1, ...)
-        messages: error messages associated with each
-    """
-    return _controller_indices(pytestconfig, "pcie", "pci")
+    # Order messages of valid indices to front
+    messages.sort(key=lambda x: x == "")
+
+    return indices, messages
 
 
 @pytest.fixture(scope="session")
@@ -569,16 +573,10 @@ def _vm_impl(request, kernel, num_hosts, hw, mem, controller):
         return
 
     if hw or config.option.force_usb or config.option.force_pcie:
-        if config.option.pcie or config.option.force_pcie:
-            fixture, kind = "pcie_indices", "PCIe"
-        else:
-            fixture, kind = "usb_indices", "USB"
-
-        hw_indices, messages = request.getfixturevalue(fixture)
+        hw_indices, messages = request.getfixturevalue("hw_indices")
         if len(hw_indices) < num_hosts:
             message = "\n".join(m for m in messages[:num_hosts] if m)
-            reason = f"Not enough {kind} controllers"
-            pytest.skip(reason=f"{reason}: {message}" if message else reason)
+            pytest.skip(reason=f"Not enough HW controllers: {message}")
     else:
         hw_indices = None
 
