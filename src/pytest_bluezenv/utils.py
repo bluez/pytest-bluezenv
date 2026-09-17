@@ -60,6 +60,12 @@ logging.addLevelName(OUT, "OUT")
 def quoted(args):
     """
     Quote shell command
+
+    Args:
+        args (sequence): command arguments to join and shell-quote.
+
+    Returns:
+        str: the quoted command line.
     """
     return " ".join(shlex.quote(arg) for arg in args)
 
@@ -82,6 +88,17 @@ def find_exe(subdir, name):
     """
     Find absolute path to the given executable, either within BlueZ
     build directory or on host.
+
+    Args:
+        subdir (str): BlueZ source subdirectory, e.g. ``"src"`` or
+            ``"client"``.  Use ``""`` for programs not built by BlueZ.
+        name (str): executable name.
+
+    Returns:
+        str: absolute path to the executable.
+
+    Raises:
+        FileNotFoundError: if the executable is not found.
 
     Example:
 
@@ -139,6 +156,25 @@ def wait_files(jobs, paths, timeout=2):
 
 
 def wait_until(predicate, *a, timeout=None, **kw):
+    """
+    Call ``predicate(*a, **kw)`` repeatedly until it returns true.
+
+    Args:
+        predicate (callable): condition to poll.
+        *a: positional arguments passed to ``predicate``.
+        timeout (float): seconds to wait before giving up.  Default:
+            ``DEFAULT_TIMEOUT``.
+        **kw: keyword arguments passed to ``predicate``.
+
+    Raises:
+        TimeoutError: if the predicate is not satisfied before the timeout.
+
+    Example:
+
+        .. code-block:: python
+
+           wait_until(host.agent.has_device, address)
+    """
     if timeout is None:
         timeout = DEFAULT_TIMEOUT
 
@@ -154,6 +190,12 @@ def wait_until(predicate, *a, timeout=None, **kw):
 def get_bdaddr(index=0):
     """
     Get bdaddr of controller with given index
+
+    Args:
+        index (int): controller index, i.e. ``hci<index>``.
+
+    Returns:
+        str: the controller address, lower case.
     """
     btmgmt = find_exe("tools", "btmgmt")
     res = subprocess.run(
@@ -181,6 +223,17 @@ def get_bdaddr(index=0):
 def mainloop_invoke(func, *a, **kw):
     """
     Blocking invoke of `func` in GLib main loop.
+
+    Args:
+        func (callable): function to run in the main loop.
+        *a: positional arguments passed to ``func``.
+        **kw: keyword arguments passed to ``func``.
+
+    Returns:
+        object: the return value of ``func``.
+
+    Raises:
+        BaseException: any exception raised by ``func``.
 
     Note:
 
@@ -225,6 +278,13 @@ def mainloop_wrap(func):
     """
     Wrap function to run in GLib main loop thread
 
+    Args:
+        func (callable): function to wrap.
+
+    Returns:
+        callable: wrapper that invokes ``func`` in the main loop and
+        returns its value.
+
     Note:
 
         GLib main loop is only available for VM host plugins, not in tester.
@@ -248,6 +308,12 @@ def mainloop_wrap(func):
 def mainloop_assert(func):
     """
     Wrap function to assert it runs from GLib main loop
+
+    Args:
+        func (callable): function to wrap.
+
+    Returns:
+        callable: wrapper that raises if not called from the main loop.
 
     Note:
 
@@ -286,7 +352,10 @@ def get_dbus(session=False, private=False):
 
     Note:
 
-        Only available for VM host side code, not in tester.
+        Only available for VM-host code in the lower tester.
+
+    Returns:
+        object: system or session bus connection.
 
     """
 
@@ -317,7 +386,24 @@ class TmpDir(tempfile.TemporaryDirectory):
 
 def run(*args, input=None, capture_output=False, timeout=None, check=False, **kwargs):
     """
-    Same as subprocess.run() but log output while running.
+    Run a command and log its output while it executes.
+
+    Args:
+        *args: positional arguments passed to ``subprocess.run``.
+        input: standard input passed to the process.
+        capture_output (bool): capture standard output and error.
+        timeout (float): seconds to wait for completion.
+        check (bool): raise for a non-zero exit status.
+        **kwargs: keyword arguments passed to ``subprocess.run``.
+
+    Returns:
+        object: completed command result.
+
+    Example:
+
+        .. code-block:: python
+
+           result = run(["btmgmt", "info"], check=True, capture_output=True)
     """
     if input is not None:
         if kwargs.get("stdin") is not None:
@@ -401,6 +487,15 @@ class LogStream:
     Logger that forwards input from a stream to logging, and
     optionally tees to another stream.  The input pipe is in
     `LogStream.stream`.
+
+    Args:
+        name (str): logger name.
+        pattern (str): regular expression with groups for timestamp and
+            message; the input is parsed with it instead of being logged
+            verbatim.
+        tee (file): optional stream the input is also written to.
+        stream: existing stream to read from, instead of a fresh socket
+            pair.
 
     Example:
 
@@ -583,6 +678,12 @@ class LogStream:
         log.handle(record)
 
     def close(self, flush=True):
+        """
+        Close the stream and join the logging thread.
+
+        Args:
+            flush (bool): wait for remaining records to be logged.
+        """
         if self._read_thread is not None:
             if self._in is not None:
                 self.stream.close()
@@ -886,7 +987,8 @@ class KernelBugWarning(UserWarning):
 
 
 class SanitizerWarning(UserWarning):
-    """Warning emitted if kernel prints BUG:/WARNING: messages"""
+    """Warning emitted if a sanitizer report (e.g. AddressSanitizer) is
+    found in the output of a test process"""
 
     pass
 

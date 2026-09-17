@@ -44,6 +44,24 @@ class Event:
     Properties:
         kind (str): event kind
         info (dict): event properties (also available as attributes)
+        reply_cb (callable): callback for an asynchronous D-Bus reply.
+        error_cb (callable): callback for an asynchronous D-Bus error.
+        reply_type (callable): converter for reply values.
+
+    Args:
+        kind (str): event kind, matched by ``expect()``.
+        reply_cb (callable): callback for a successful reply.
+        error_cb (callable): callback for an error reply.
+        reply_type (callable): converter for reply values.
+        info (dict): event properties, also accessible as attributes.
+        **kw: extra properties merged into ``info``.
+
+    Example:
+
+        .. code-block:: python
+
+           event = host.agent.expect("org.bluez.Agent1.RequestConfirmation")
+           assert event.passkey == 1234
     """
 
     def __init__(
@@ -70,18 +88,47 @@ class Event:
 
 class EventPluginMixin:
     """
-    Simple expect() / reply() pattern for handing async events in
+    Simple ``expect()`` / ``reply()`` pattern for handling async events in
     host plugins.
 
+    Mix it into a :obj:`pytest_bluezenv.HostPlugin`, call ``EventPluginMixin.setup`` from
+    the plugin's ``setup``, and push :obj:`pytest_bluezenv.Event` instances
+    to ``self.events``.  The parent side then drives them with ``expect`` and
+    ``reply``.
+
+    Example:
+
+        .. code-block:: python
+
+           class MyPlugin(HostPlugin, EventPluginMixin):
+               def setup(self, impl):
+                   EventPluginMixin.setup(self, impl)
+
+           # On the parent side:
+           event = host.myplugin.expect("org.example.Method:reply")
+           host.myplugin.reply()
     """
 
     def setup(self, impl):
+        """
+        Initialise the event queue.  Call this from the plugin's ``setup``.
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         self.events = queue.SimpleQueue()
         self.cur_event = None
 
     def get_event(self, block=True):
         """
         Get most recent pending Event, blocking optional
+
+        Args:
+            block (bool): wait for an event if none is pending yet.
+
+        Returns:
+            Event: the pending event, or None if non-blocking and none
+            is available.
         """
         if self.cur_event is not None:
             return self.cur_event
@@ -95,6 +142,9 @@ class EventPluginMixin:
     def expect(self, kinds):
         """
         Get most recent pending Event and assert its kind
+
+        Args:
+            kinds (str | sequence): accepted event kind or kinds.
 
         Returns:
             event (Event)
@@ -115,10 +165,10 @@ class EventPluginMixin:
     @utils.mainloop_wrap
     def reply(self, *value):
         """
-        Provide DBus reply to the most recent pending Event
+        Provide a D-Bus reply to the most recent pending event.
 
-        Arguments:
-            *value: DBus reply return values
+        Args:
+            *value: D-Bus reply return values.
         """
         if len(value) == 1 and isinstance(value[0], Exception):
             self.cur_event.error_cb(value[0])
@@ -130,10 +180,11 @@ class EventPluginMixin:
 
     def reply_error(self, err=None):
         """
-        Provide DBus error reply to the most recent pending Event
+        Provide a D-Bus error reply to the most recent pending event.
 
-        Arguments:
-            err (dbus.DBusException): DBus error. Default: org.bluez.Error.Rejected
+        Args:
+            err (dbus.DBusException): D-Bus error. Default:
+                ``org.bluez.Error.Rejected``.
         """
         if err is None:
             err = Rejected()
@@ -167,10 +218,10 @@ class EventPluginMixin:
         The event names are ``{iface}.{method}:reply`` and ``{iface}.{method}:error``.
 
         Args:
-            obj (dbus.Interface): interface whose method to call
-            method (str): method name
-            *a: method arguments
-            **kw: method arguments
+            obj (dbus.Interface): interface whose method to call.
+            method (str): method name.
+            *a: method arguments.
+            **kw: method keyword arguments.
 
         Example:
 
@@ -189,6 +240,12 @@ class Agent(env.HostPlugin, EventPluginMixin):
     Host plugin providing org.bluez.Agent1 test implementation.
 
     Asynchronous events are handled via expect().
+
+    Args:
+        capability (str): agent capability, e.g. ``"KeyboardDisplay"``.
+        path (str): D-Bus object path to register the agent at.
+
+    Depends on :obj:`pytest_bluezenv.Bluetoothd`.
 
     Example:
 
@@ -209,6 +266,13 @@ class Agent(env.HostPlugin, EventPluginMixin):
 
     @utils.mainloop_wrap
     def setup(self, impl):
+        """
+        Register the ``org.bluez.Agent1`` and make it the default agent
+        (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         EventPluginMixin.setup(self, impl)
 
         self.bus = utils.get_dbus(private=True)
@@ -225,6 +289,9 @@ class Agent(env.HostPlugin, EventPluginMixin):
 
     @utils.mainloop_wrap
     def teardown(self):
+        """
+        Unregister the agent (VM side).
+        """
         self.manager.UnregisterAgent(self.path)
         log.info("Agent unregistered")
 
@@ -232,6 +299,12 @@ class Agent(env.HostPlugin, EventPluginMixin):
     def has_device(self, address):
         """
         Return True if device with given address exists
+
+        Args:
+            address (str): Bluetooth device address.
+
+        Returns:
+            bool: whether BlueZ knows the device.
         """
         try:
             self._find_device(address)
@@ -247,10 +320,12 @@ class Agent(env.HostPlugin, EventPluginMixin):
         Args:
             address (str): bdaddr of target device
             method (str): name of DBus method, without interface prefix
-            *a, **kw: argument passed to the DBus method call
+            *a: positional arguments passed to the DBus method call
+            ``**kw``: keyword arguments passed to the DBus method call
 
         Events:
-            Event(kind="org.bluez.Device1.{method}:reply")
+            Event(kind="org.bluez.Device1.{method}:reply") or
+            Event(kind="org.bluez.Device1.{method}:error").
         """
         device = self._find_device(address)
         self._object_method(device, method, *a, **kw)
@@ -262,10 +337,12 @@ class Agent(env.HostPlugin, EventPluginMixin):
 
         Args:
             method (str): name of DBus method, without interface prefix
-            *a, **kw: argument passed to the DBus method call
+            *a: positional arguments passed to the DBus method call
+            ``**kw``: keyword arguments passed to the DBus method call
 
         Events:
-            Event(kind="org.bluez.Adapter1.{method}")
+            Event(kind="org.bluez.Adapter1.{method}:reply") or
+            Event(kind="org.bluez.Adapter1.{method}:error").
         """
         adapter = dbus.Interface(
             self.bus.get_object(BUS_NAME, "/org/bluez/hci0"), ADAPTER_INTERFACE
@@ -276,6 +353,10 @@ class Agent(env.HostPlugin, EventPluginMixin):
     def adapter_set(self, key, value):
         """
         Set given org.bluez.Adapter1 property
+
+        Args:
+            key (str): property name.
+            value: property value.
         """
         adapter = dbus.Interface(
             self.bus.get_object(BUS_NAME, "/org/bluez/hci0"), PROPS_INTERFACE
@@ -286,6 +367,12 @@ class Agent(env.HostPlugin, EventPluginMixin):
     def adapter_get(self, key):
         """
         Get given org.bluez.Adapter1 property
+
+        Args:
+            key (str): property name.
+
+        Returns:
+            object: current property value.
         """
         adapter = dbus.Interface(
             self.bus.get_object(BUS_NAME, "/org/bluez/hci0"), PROPS_INTERFACE
@@ -317,6 +404,15 @@ def dbus_service_event_method(
     """
     dbus.service.method that pushes Event instances to self.events
 
+    Args:
+        interface (str): D-Bus interface name.
+        name (str): method name.
+        args (tuple): argument names, passed to the event as properties.
+        in_signature (str): D-Bus in-signature.
+        out_signature (str): D-Bus out-signature (asynchronous methods only).
+        sync (bool): whether the method replies synchronously.  If false,
+            the event carries reply/error callbacks for ``reply()``.
+
     Example:
 
         .. code-block:: python
@@ -330,7 +426,10 @@ def dbus_service_event_method(
                AuthorizeService = dbus_service_event_method(
                    "org.bluez.Agent1",
                    "AuthorizeService", ("device", "uuid"), "os", sync=False
-               )
+                )
+
+    Returns:
+        callable: decorated D-Bus service method.
 
     """
 

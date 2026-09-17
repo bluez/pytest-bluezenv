@@ -32,9 +32,11 @@ __all__ = [
 
 class RemoteError(Exception):
     """
-    Exception raised on the VM side, passed through RPC. Properties:
-    `traceback` is a traceback string and `exc` is the original exception
-    instance raised on the remote side.
+    Exception raised in a VM host and passed through RPC.
+
+    Attributes:
+        exc (BaseException): original VM-host exception.
+        traceback (str): VM-host traceback.
 
     Example:
 
@@ -51,6 +53,13 @@ class RemoteError(Exception):
     """
 
     def __init__(self, exc, traceback):
+        """
+        Store a remote exception and traceback.
+
+        Args:
+            exc (BaseException): exception raised in the VM host.
+            traceback (str): formatted VM-host traceback.
+        """
         super().__init__(str(exc))
         self.exc = exc
         self.traceback = traceback
@@ -61,6 +70,11 @@ class RemoteError(Exception):
 
 
 class RemoteTimeoutError(TimeoutError):
+    """
+    Raised when an RPC call to a VM host does not reply within its
+    timeout (see ``--vm-timeout``).
+    """
+
     pass
 
 

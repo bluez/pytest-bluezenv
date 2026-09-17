@@ -50,12 +50,24 @@ class Bdaddr(env.HostPlugin):
     name = "bdaddr"
 
     def setup(self, impl):
+        """
+        Read the controller address and expose it as ``host.bdaddr``
+        (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         self.value = utils.get_bdaddr()
 
 
 class Rcvbuf(env.HostPlugin):
     """
     Host plugin setting pipe buffer size defaults. Loaded by default.
+
+    Args:
+        rcvbuf (int): default ``SO_RCVBUF`` (``rmem_default``) to set on
+            the host.  Default: from the ``host_plugins.rcvbuf.default``
+            ini option.
     """
 
     name = "rcvbuf"
@@ -64,12 +76,21 @@ class Rcvbuf(env.HostPlugin):
         self.rcvbuf = rcvbuf
 
     def presetup(self, config):
+        """
+        Resolve the receive-buffer size from the ini default (parent side).
+        """
         if self.rcvbuf is None:
             self.rcvbuf = config.getini("host_plugins.rcvbuf.default")
 
         self.rcvbuf = int(self.rcvbuf)
 
     def setup(self, impl):
+        """
+        Set the default socket receive buffer (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         self.log = logging.getLogger(self.name)
 
         self.log.info(f"Set SO_RCVBUF default = {self.rcvbuf}")
@@ -81,6 +102,17 @@ class Call(env.HostPlugin):
     """
     Host plugin providing ``host.call(func, *args, **kw)``
     which invokes the given functions on VM host side.  Loaded by default.
+
+    Args:
+        func (callable): function to run on the VM host.  It and its
+            arguments must be picklable / importable on the VM.
+        *args: positional arguments passed to ``func``.
+        **kw: keyword arguments passed to ``func``; the extra keyword
+            ``sync`` (default true) controls the return value.
+
+    Returns:
+        object: the return value of ``func`` if ``sync`` is true, else a
+        handle whose ``wait()`` returns it later.
 
     Example:
 
@@ -100,14 +132,40 @@ class Call(env.HostPlugin):
     name = "call"
 
     def setup(self, impl):
+        """
+        Publish the call proxy as ``host.call`` (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         self._results = {}
         self._id = 0
         self.value = self.Proxy()
 
     def __call__(self, func, *a, **kw):
+        """
+        Run a function synchronously in the VM host.
+
+        Args:
+            func (callable): function to run.
+            *a: positional arguments passed to ``func``.
+            **kw: keyword arguments passed to ``func``.
+
+        Returns:
+            object: return value of ``func``.
+        """
         return func(*a, **kw)
 
     def call_async(self, func, *a, **kw):
+        """
+        Run ``func`` on the VM and remember the result for ``wait_async``.
+        Backs asynchronous (``sync=False``) calls.
+
+        Args:
+            func (callable): function to run.
+            *a: positional arguments passed to ``func``.
+            **kw: keyword arguments passed to ``func``.
+        """
         value = None
         try:
             value = func(*a, **kw)
@@ -119,13 +177,41 @@ class Call(env.HostPlugin):
             self._results[self._id] = value
 
     def wait_async(self, id_value):
+        """
+        Return and forget the stored result of an asynchronous call.
+
+        Args:
+            id_value (int): identifier returned for the asynchronous call.
+
+        Returns:
+            object: saved function result.
+        """
         return self._results.pop(id_value)
 
     class Proxy(env.PluginProxy):
+        """
+        Parent-side handle returned as ``host.call``.  Calling it
+        (``host.call(...)``) invokes a function on the VM; see
+        :obj:`Call`.
+        """
+
         def __init__(self):
             self._id = 0
 
         def __call__(self, func, *a, **kw):
+            """
+            Invoke ``func`` on the VM.
+
+            Args:
+                func (callable): function to run on the VM.
+                *a: positional arguments to ``func``.
+                ``**kw``: keyword arguments to ``func``; ``sync=False``
+                    returns a :obj:`Call.ResultProxy` instead of blocking.
+
+            Returns:
+                object: the function result, or a result handle when
+                ``sync=False``.
+            """
             if kw.pop("sync", True):
                 return self._conn.call(
                     "call_plugin", self._name, "__call__", func, *a, **kw
@@ -138,22 +224,46 @@ class Call(env.HostPlugin):
                 return Call.ResultProxy(self, self._id)
 
     class ResultProxy:
+        """
+        Handle for a ``sync=False`` :obj:`Call`; ``wait()`` collects the
+        result once the VM-side call has finished.
+        """
+
         def __init__(self, plugin, id_value):
+            """
+            Store the parent-side call proxy and result identifier.
+
+            Args:
+                plugin (Call.Proxy): proxy that started the call.
+                id_value (int): asynchronous call identifier.
+            """
             self.plugin = plugin
             self.id_value = id_value
 
         def wait(self):
+            """
+            Wait for and return the result of the asynchronous call.
+
+            Returns:
+                object: return value of the VM-host function.
+            """
             return self.plugin.wait_async(self.id_value)
 
 
 class _Dbus(env.HostPlugin):
     def presetup(self, config):
+        """
+        Locate ``dbus-daemon`` on the parent host (skip the test if absent).
+        """
         try:
             self.exe = utils.find_exe("", "dbus-daemon")
         except FileNotFoundError as exc:
             pytest.skip(reason=f"DBus: {exc!r}")
 
     def setup(self, impl):
+        """
+        Start a private ``dbus-daemon`` for this bus (VM side).
+        """
         self.log = logging.getLogger(self.name)
         self.log_stream = utils.LogStream(self.name)
 
@@ -213,14 +323,24 @@ class _Dbus(env.HostPlugin):
         self.log.debug(f"{self.name} ready")
 
     def teardown(self):
+        """
+        Stop the private ``dbus-daemon`` and clean up (VM side).
+        """
         self.job.terminate()
         self.tmpdir.cleanup()
 
 
 class DbusSystem(_Dbus):
     """
-    Host plugin providing system DBus, at address
-    `impl.plugins["dbus-system"].address`.
+    Host plugin starting a private system D-Bus for VM-host plugins.
+
+    Example:
+
+        .. code-block:: python
+
+           @host_config([DbusSystem(), MyPlugin()])
+           def test_private_bus(hosts):
+               ...
 
     Warning:
         dbus-python **MUST** be used only from the GLib main loop,
@@ -234,8 +354,15 @@ class DbusSystem(_Dbus):
 
 class DbusSession(_Dbus):
     """
-    Host plugin providing system DBus, at address
-    `impl.plugins["dbus-session"].address`.
+    Host plugin starting a private session D-Bus for VM-host plugins.
+
+    Example:
+
+        .. code-block:: python
+
+           @host_config([DbusSession(), MyPlugin()])
+           def test_private_session_bus(hosts):
+               ...
 
     Warning:
         dbus-python **MUST** be used only from the GLib main loop,
@@ -250,6 +377,24 @@ class DbusSession(_Dbus):
 class Bluetoothd(env.HostPlugin):
     """
     Host plugin starting Bluetoothd.
+
+    Args:
+        debug (bool): pass ``-d`` to enable debug logging (default).
+        conf (str): contents of ``main.conf``, written to a per-test
+            config file.  Use it to set options such as ``ControllerMode``
+            or ``Experimental``.
+        args (sequence): extra command-line arguments for ``bluetoothd``.
+
+    Depends on :obj:`pytest_bluezenv.DbusSystem`.
+
+    Example:
+
+        .. code-block:: python
+
+           @host_config([Bluetoothd(conf="[General]\\nExperimental = true")])
+           def test_experimental(hosts):
+               ...
+
     """
 
     name = "bluetoothd"
@@ -264,6 +409,9 @@ class Bluetoothd(env.HostPlugin):
             self.args += ("-d",)
 
     def presetup(self, config):
+        """
+        Locate ``bluetoothd`` on the parent host (skip the test if absent).
+        """
         try:
             self.exe = utils.find_exe("src", "bluetoothd")
         except FileNotFoundError as exc:
@@ -271,6 +419,10 @@ class Bluetoothd(env.HostPlugin):
 
     @utils.mainloop_wrap
     def setup(self, impl):
+        """
+        Start ``bluetoothd`` with a per-test config and state dir, and
+        wait for the adapter to come up (VM side).
+        """
         self.log = logging.getLogger(self.name)
 
         exe = self.exe
@@ -324,6 +476,9 @@ class Bluetoothd(env.HostPlugin):
         self.log.info("Bluetoothd ready")
 
     def teardown(self):
+        """
+        Stop ``bluetoothd`` and remove its state directory (VM side).
+        """
         self.log.info("Stop bluetoothd")
         self.job.terminate()
         self.tmpdir.cleanup()
@@ -332,6 +487,16 @@ class Bluetoothd(env.HostPlugin):
 class Obexd(env.HostPlugin):
     """
     Host plugin starting obexd.
+
+    Depends on :obj:`Bluetoothd` and :obj:`DbusSession`.
+
+    Example:
+
+        .. code-block:: python
+
+           @host_config([Obexd()])
+           def test_obex(hosts):
+               ...
     """
 
     name = "obexd"
@@ -341,6 +506,9 @@ class Obexd(env.HostPlugin):
         self.uuids = ("00001133-0000-1000-8000-00805f9b34fb",)
 
     def presetup(self, config):
+        """
+        Locate ``obexd`` on the parent host (skip the test if absent).
+        """
         try:
             self.exe = utils.find_exe("obexd/src", "obexd")
         except FileNotFoundError as exc:
@@ -348,6 +516,10 @@ class Obexd(env.HostPlugin):
 
     @utils.mainloop_wrap
     def setup(self, impl):
+        """
+        Start ``obexd`` and wait for it to register with bluetoothd
+        (VM side).
+        """
         self.log = logging.getLogger(self.name)
 
         self.path = Path("/run/obex")
@@ -381,6 +553,9 @@ class Obexd(env.HostPlugin):
         self.log.info("Obexd ready")
 
     def teardown(self):
+        """
+        Stop ``obexd`` and remove its root directory (VM side).
+        """
         self.log.info("Stop obexd")
         self.job.terminate()
         shutil.rmtree(self.path)
@@ -404,6 +579,13 @@ class Pexpect(env.HostPlugin):
     depends = []
 
     def setup(self, impl):
+        """
+        Start the pexpect controller and publish it as ``host.pexpect``
+        (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         self.ctls = {}
         self.ctl_id = 0
         self.log = logging.getLogger(self.name)
@@ -412,6 +594,16 @@ class Pexpect(env.HostPlugin):
         self.value = self.Proxy()
 
     def spawn(self, cmd):
+        """
+        Start a process on the host and return a handle to it.
+
+        Args:
+            cmd (list): command and arguments.
+
+        Returns:
+            handle: object with ``send``, ``expect`` and ``close``
+            methods, and usable as a context manager.
+        """
         from pexpect.popen_spawn import PopenSpawn
 
         self.log.info("Spawn {}".format(utils.quoted(cmd)))
@@ -426,33 +618,91 @@ class Pexpect(env.HostPlugin):
         return self.ctl_id
 
     def teardown(self):
+        """
+        Kill all processes spawned through this plugin (VM side).
+        """
         for ctl in self.ctls.values():
             ctl.sendeof()
             ctl.kill(signal.SIGTERM)
 
     def close(self, ctl_id):
+        """
+        Close one spawned process and forget its handle.
+
+        Args:
+            ctl_id (int): spawned-process identifier.
+        """
         ctl = self.ctls[ctl_id]
         ctl.sendeof()
         ctl.kill(signal.SIGTERM)
         del self.ctls[ctl_id]
 
     def expect(self, ctl_id, *a, **kw):
+        """
+        Wait for a pattern in one process' output.
+
+        Args:
+            ctl_id (int): spawned-process identifier.
+            *a: positional arguments passed to ``pexpect.expect``.
+            **kw: keyword arguments passed to ``pexpect.expect``.
+
+        Returns:
+            tuple: ``(index, groups)`` of the match, as in pexpect.
+        """
         ctl = self.ctls[ctl_id]
         ret = ctl.expect(*a, **kw)
         self.log.debug("match found")
         return ret, ctl.match.groups()
 
     def send(self, ctl_id, *a, **kw):
+        """
+        Write to one process' standard input.
+
+        Args:
+            ctl_id (int): spawned-process identifier.
+            *a: positional arguments passed to ``pexpect.send``.
+            **kw: keyword arguments passed to ``pexpect.send``.
+
+        Returns:
+            int: number of bytes sent.
+        """
         ctl = self.ctls[ctl_id]
         return ctl.send(*a, **kw)
 
     class Proxy(env.PluginProxy):
+        """
+        Parent-side handle returned as ``host.pexpect``.  ``spawn()``
+        starts a process and returns a :obj:`Pexpect.CtlProxy`.
+        """
+
         def spawn(self, cmd):
+            """
+            Spawn a process on the VM; see :obj:`Pexpect.spawn`.
+
+            Args:
+                cmd (sequence): command and arguments.
+
+            Returns:
+                Pexpect.CtlProxy: handle to the spawned process.
+            """
             ctl_id = self._conn.call("call_plugin", self._name, "spawn", cmd)
             return Pexpect.CtlProxy(self, ctl_id)
 
     class CtlProxy:
+        """
+        Handle for one process spawned by :obj:`Pexpect`.  Attribute
+        access dispatches over RPC, giving ``send``, ``expect`` and
+        ``close``; usable as a context manager (closes on exit).
+        """
+
         def __init__(self, plugin, ctl_id):
+            """
+            Store a process handle.
+
+            Args:
+                plugin (Pexpect.Proxy): parent-side process plugin proxy.
+                ctl_id (int): spawned-process identifier.
+            """
             self._plugin = plugin
             self.ctl_id = ctl_id
 
@@ -469,19 +719,36 @@ class Pexpect(env.HostPlugin):
 
 class Bluetoothctl(env.HostPlugin):
     """
-    Host plugin for starting and controlling `bluetoothctl` with pexpect.
+    Host plugin for starting and controlling ``bluetoothctl`` with pexpect.
+
+    Example:
+
+        .. code-block:: python
+
+           @host_config([Bluetoothctl()])
+           def test_info(hosts):
+               hosts[0].bluetoothctl.send("show\\n")
     """
 
     name = "bluetoothctl"
     depends = [Bluetoothd()]
 
     def presetup(self, config):
+        """
+        Locate ``bluetoothctl`` on the parent host (skip if absent).
+        """
         try:
             self.exe = utils.find_exe("client", "bluetoothctl")
         except FileNotFoundError as exc:
             pytest.skip(reason=f"Bluetoothctl: {exc!r}")
 
     def setup(self, impl):
+        """
+        Spawn ``bluetoothctl`` under pexpect (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         from pexpect.popen_spawn import PopenSpawn
 
         self.log = logging.getLogger(self.name)
@@ -495,15 +762,38 @@ class Bluetoothctl(env.HostPlugin):
         )
 
     def teardown(self):
+        """
+        Close the ``bluetoothctl`` process (VM side).
+        """
         self.ctl.sendeof()
         self.ctl.kill(signal.SIGTERM)
 
     def expect(self, *a, **kw):
+        """
+        Wait for a pattern in the ``bluetoothctl`` output.
+
+        Args:
+            *a: positional arguments passed to ``pexpect.expect``.
+            **kw: keyword arguments passed to ``pexpect.expect``.
+
+        Returns:
+            tuple: ``(index, groups)`` of the match, as in pexpect.
+        """
         ret = self.ctl.expect(*a, **kw)
         self.log.debug("match found")
         return ret, self.ctl.match.groups()
 
     def send(self, *a, **kw):
+        """
+        Write a command to the ``bluetoothctl`` prompt.
+
+        Args:
+            *a: positional arguments passed to ``pexpect.send``.
+            **kw: keyword arguments passed to ``pexpect.send``.
+
+        Returns:
+            int: number of bytes sent.
+        """
         return self.ctl.send(*a, **kw)
 
 
@@ -555,12 +845,27 @@ def parametrized_host_config(
         hw (bool): whether to require hardware BT controller
         mem (str): amount of memory for the VM instances
         controller (bool): whether to add controller to the host
+        ids (sequence): parameter IDs. Default: generated setup names.
         reuse (bool): whether to define a setup where the test host processes
             are not required to be torn down between tests. This is only useful
             for tests that do not perturb e.g. bluetoothd state too much.
 
     Returns:
         callable: decorator setting pytest attributes
+
+    Example:
+
+        .. code-block:: python
+
+           bredr = [Bluetoothd()]
+           le = [Bluetoothd(conf="[General]\\nControllerMode = le")]
+
+           @parametrized_host_config(
+                [[bredr], [le]],
+                ids=["bredr", "le"],
+            )
+           def test_pairing_mode(hosts):
+               ...
     """
     global HOST_SETUPS
 

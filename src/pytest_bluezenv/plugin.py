@@ -432,8 +432,11 @@ def kernel(pytestconfig):
     """
     Fixture for kernel image. Skips tests if no kernel available.
 
-    Yields:
-        kernel (str): path to the kernel image
+    Args:
+        pytestconfig (pytest.Config): pytest configuration.
+
+    Returns:
+        str: path to the kernel image.
     """
     kernel = pytestconfig.getoption("kernel")
 
@@ -488,9 +491,12 @@ def hw_indices(pytestconfig):
     """
     Fixture for available HW USB controllers. Skips tests if not available.
 
-    Yields:
-        usb_indices: list of usb controller names (hci0, hci1, ...)
-        messages: error messages associated with each
+    Args:
+        pytestconfig (pytest.Config): pytest configuration.
+
+    Returns:
+        tuple[list[str], list[str]]: controller names and associated
+        availability messages.
     """
     kinds = []
 
@@ -520,8 +526,11 @@ def host_setup(request):
     """
     Host setup configuration
 
-    Yields:
-        dict[setup: tuple[HostPlugin], name: str, reuse: bool]
+    Args:
+        request (pytest.FixtureRequest): parametrized fixture request.
+
+    Returns:
+        dict: setup plugins, reuse-group name, and reuse setting.
     """
     if getattr(request, "param", None) is None:
         raise pytest.fail("host setup not specified")
@@ -538,8 +547,11 @@ def vm_setup(request):
     """
     VM setup configuration
 
-    Yields:
-        (num_hosts: int, hw_controllers: bool)
+    Args:
+        request (pytest.FixtureRequest): parametrized fixture request.
+
+    Returns:
+        dict: VM-host count, controller, memory, and hardware settings.
     """
     if getattr(request, "param", None) is None:
         raise pytest.fail("env setup not specified")
@@ -745,8 +757,13 @@ def vm(request, kernel, vm_setup):
     """
     Function-scope virtual machine fixture. Used internally by `hosts`.
 
+    Args:
+        request (pytest.FixtureRequest): test fixture request.
+        kernel (str): selected kernel image.
+        vm_setup (dict): VM-host configuration.
+
     Yields:
-        env.Environment
+        env.Environment: VM-host environment.
     """
     yield from _vm_impl(request, kernel, **vm_setup)
 
@@ -755,9 +772,18 @@ def vm(request, kernel, vm_setup):
 def hosts(request, vm, host_setup):
     """
     Function-scope fixture that expands to a list of VM host proxies
-    (:obj:`HostProxy`), with configuration as specified in :obj:`host_config`.
+    (:obj:`~pytest_bluezenv.HostProxy`), with configuration as specified in
+    :obj:`~pytest_bluezenv.host_config`.
     The VM instances used may be reused by other tests.  The userspace test
     runner is torn down between tests.
+
+    Args:
+        request (pytest.FixtureRequest): test fixture request.
+        vm (env.Environment): shared VM-host environment.
+        host_setup (dict): host-plugin configuration.
+
+    Yields:
+        list[HostProxy]: configured VM-host proxies.
 
     Example:
 
@@ -778,8 +804,13 @@ def vm_once(request, kernel, vm_setup):
     """
     Function-scope virtual machine fixture. Used internally by `hosts_once`.
 
+    Args:
+        request (pytest.FixtureRequest): test fixture request.
+        kernel (str): selected kernel image.
+        vm_setup (dict): VM-host configuration.
+
     Yields:
-        env.Environment
+        env.Environment: private VM-host environment.
     """
     yield from _vm_impl(request, kernel, **vm_setup)
 
@@ -787,8 +818,16 @@ def vm_once(request, kernel, vm_setup):
 @pytest.fixture
 def hosts_once(request, vm_once, host_setup):
     """
-    Function-scope fixture. Same as `hosts`, but spawn separate VM
-    instances for this test only.
+    Function-scope fixture like :obj:`hosts`, but creates VM hosts for
+    this test only.
+
+    Args:
+        request (pytest.FixtureRequest): test fixture request.
+        vm_once (env.Environment): private VM-host environment.
+        host_setup (dict): host-plugin configuration.
+
+    Yields:
+        list[HostProxy]: configured private VM-host proxies.
 
     Example:
 
