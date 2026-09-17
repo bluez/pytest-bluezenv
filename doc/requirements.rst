@@ -4,28 +4,24 @@ Requirements
 General
 -------
 
-The following are needed:
+pytest-bluezenv requires:
 
-- QEmu (x86_64)
-- ``dbus-daemon`` available
+- QEMU for x86_64
+- ``dbus-daemon``
 
-Recommended:
+The following are recommended:
 
-- KVM-enabled x86_64 host system
-- Preferably built BlueZ source tree
-- ``chronyd`` available
-- ``util-linux`` tools available
-- ``agetty`` available
+- An x86_64 host with KVM enabled
+- A built BlueZ source tree
+- ``chronyd``, ``util-linux``, and ``agetty``
 
 Kernel
 ------
 
-Running VM-based tests requires a kernel image with similar
-config as BlueZ **test-runner(1)**.  If given `--kernel-build` option, a
-suitable image is built from sources downloaded under
-`.pytest_cache`.
+VM-host tests require a kernel image. ``--kernel-build`` builds a suitable
+image from sources in ``.pytest_cache`` when needed.
 
-Simplest setup is
+A BlueZ source tree provides a suitable base configuration:
 
 .. code-block::
 
@@ -33,8 +29,7 @@ Simplest setup is
 	make olddefconfig
 	make -j8
 
-To get log timestamps right, the kernel should have the following
-configuration enabled:
+For accurate VM-host log timestamps, the kernel needs these options:
 
 .. code-block::
 
@@ -49,4 +44,7 @@ configuration enabled:
 USB
 ---
 
-Some tests may require a hardware controller instead of the virtual `btvirt` one.
+Some tests require a hardware controller rather than ``btvirt``. USB
+pass-through requires permission to open the controller. PCIe pass-through
+requires root, an enabled IOMMU, and an isolated IOMMU group. The relevant
+commands are documented in :doc:`running_tests`.

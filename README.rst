@@ -2,16 +2,20 @@
 pytest-bluezenv
 ===============
 
-**pytest-bluezenv** Pytest plugin is used for functional testing of
-BlueZ and kernel using multiple virtual machine environments,
-connected by real or virtual controllers.
+**pytest-bluezenv** is a `pytest <https://pytest.org>`_ plugin for
+functional testing of the Linux Bluetooth stack and applications.
 
-- Source code: https://github.com/pv/pytest-bluezenv/
-- Documentation: https://pv.github.io/pytest-bluezenv/
+- Source code: https://github.com/bluez/pytest-bluezenv/
+- Documentation: https://bluez.github.io/pytest-bluezenv/
 - PyPi: https://pypi.org/project/pytest-bluezenv/
 
 Example
 -------
+
+A test declares the plugins for each VM host. pytest-bluezenv starts the VM
+hosts and exposes them through RPC. VM hosts communicate through emulated
+``btvirt`` controllers by default, or through passed-through USB or PCIe
+controllers.
 
 .. code-block:: python
 

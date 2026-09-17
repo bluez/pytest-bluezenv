@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 900 150"
+   width="900"
+   height="150"
+   version="1.1"
+   role="img"
+   aria-labelledby="c-title c-desc"
+   id="svg16"
+   sodipodi:docname="controllers.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview16"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.3898577"
+     inkscape:cx="432.77813"
+     inkscape:cy="94.614005"
+     inkscape:window-width="1920"
+     inkscape:window-height="1014"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg16" />
+  <title
+     id="c-title">btvirt controller bus</title>
+  <desc
+     id="c-desc">Each VM host has its own controller, reached over HCI by the kernel. By default the controllers are emulated by a single btvirt process, which bridges a virtual air link between them so the hosts see each other.</desc>
+  <defs
+     id="defs1">
+    <marker
+       id="arrow"
+       viewBox="0 0 10 10"
+       refX="9"
+       refY="5"
+       markerWidth="7"
+       markerHeight="7"
+       orient="auto-start-reverse">
+      <path
+         d="M 0 0 L 10 5 L 0 10 z"
+         fill="#5b6470"
+         id="path1" />
+    </marker>
+    <style
+       id="style1">
+      .card  { fill:#ffffff; stroke:#d7dbe0; stroke-width:1.5; }
+      .grp   { fill:none; stroke:#9aa4b2; stroke-width:1.2; stroke-dasharray:5 4; }
+      .cap   { fill:#6b7280; font:600 12px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; letter-spacing:.3px; }
+      .chip  { fill:#eef1f5; stroke:#c9d3e2; stroke-width:1; }
+      .chiptx{ fill:#1f2430; font:600 12.5px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .hctrl { fill:#eef4ff; stroke:#5aa2ff; stroke-width:1.5; }
+      .hctltx{ fill:#0b5bd3; font:700 13px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .wire  { stroke:#5b6470; stroke-width:2; fill:none; }
+      .wtxt  { fill:#5b6470; font:600 11px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .air   { stroke:#5aa2ff; stroke-width:2; fill:none; stroke-dasharray:4 4; }
+      .wave  { stroke:#5aa2ff; stroke-width:2; fill:none; stroke-linecap:round; }
+    </style>
+  </defs>
+  <!-- VM #0 group -->
+  <rect
+     class="grp"
+     x="32"
+     y="44"
+     width="232"
+     height="86"
+     rx="12"
+     id="rect2" />
+  <text
+     class="cap"
+     x="148"
+     y="63"
+     text-anchor="middle"
+     id="text2">VM HOST #0</text>
+  <rect
+     class="chip"
+     x="46"
+     y="74"
+     width="88"
+     height="42"
+     rx="8"
+     id="rect3" />
+  <text
+     class="chiptx"
+     x="90"
+     y="100"
+     text-anchor="middle"
+     id="text3">kernel</text>
+  <rect
+     class="hctrl"
+     x="170"
+     y="74"
+     width="80"
+     height="42"
+     rx="8"
+     id="rect4" />
+  <text
+     class="hctltx"
+     x="210"
+     y="100"
+     text-anchor="middle"
+     id="text4">hci0</text>
+  <path
+     class="wire"
+     d="M 134 95 L 170 95"
+     marker-start="url(#arrow)"
+     marker-end="url(#arrow)"
+     id="path4" />
+  <!-- btvirt in the middle -->
+  <rect
+     class="hctrl"
+     x="404"
+     y="66"
+     width="92"
+     height="58"
+     rx="10"
+     id="rect5" />
+  <text
+     class="hctltx"
+     x="450"
+     y="92"
+     text-anchor="middle"
+     id="text5">btvirt</text>
+  <text
+     class="wtxt"
+     x="450"
+     y="109"
+     text-anchor="middle"
+     id="text6">emulated</text>
+  <!-- air link VM#0 controller <-> btvirt -->
+  <line
+     class="air"
+     x1="250"
+     y1="95"
+     x2="404"
+     y2="95"
+     id="line6" />
+  <path
+     class="wave"
+     d="M 302 83 A 14 14 0 0 1 302 107"
+     id="path6" />
+  <path
+     class="wave"
+     d="M 294 77 A 22 22 0 0 1 294 113"
+     id="path7" />
+  <path
+     class="wave"
+     d="M 352 83 A 14 14 0 0 0 352 107"
+     id="path8" />
+  <path
+     class="wave"
+     d="M 360 77 A 22 22 0 0 0 360 113"
+     id="path9" />
+  <text
+     class="wtxt"
+     x="327"
+     y="70"
+     text-anchor="middle"
+     id="text9">virtual air link</text>
+  <!-- air link btvirt <-> VM#1 controller -->
+  <line
+     class="air"
+     x1="496"
+     y1="95"
+     x2="650"
+     y2="95"
+     id="line9" />
+  <path
+     class="wave"
+     d="M 548 83 A 14 14 0 0 1 548 107"
+     id="path10" />
+  <path
+     class="wave"
+     d="M 540 77 A 22 22 0 0 1 540 113"
+     id="path11" />
+  <path
+     class="wave"
+     d="M 598 83 A 14 14 0 0 0 598 107"
+     id="path12" />
+  <path
+     class="wave"
+     d="M 606 77 A 22 22 0 0 0 606 113"
+     id="path13" />
+  <text
+     class="wtxt"
+     x="573"
+     y="70"
+     text-anchor="middle"
+     id="text13">virtual air link</text>
+  <!-- VM #1 group -->
+  <rect
+     class="grp"
+     x="636"
+     y="44"
+     width="232"
+     height="86"
+     rx="12"
+     id="rect13" />
+  <text
+     class="cap"
+     x="752"
+     y="63"
+     text-anchor="middle"
+     id="text14">VM HOST #1</text>
+  <rect
+     class="hctrl"
+     x="650"
+     y="74"
+     width="80"
+     height="42"
+     rx="8"
+     id="rect14" />
+  <text
+     class="hctltx"
+     x="690"
+     y="100"
+     text-anchor="middle"
+     id="text15">hci0</text>
+  <rect
+     class="chip"
+     x="766"
+     y="74"
+     width="88"
+     height="42"
+     rx="8"
+     id="rect15" />
+  <text
+     class="chiptx"
+     x="810"
+     y="100"
+     text-anchor="middle"
+     id="text16">kernel</text>
+  <path
+     class="wire"
+     d="M 730 95 L 766 95"
+     marker-start="url(#arrow)"
+     marker-end="url(#arrow)"
+     id="path16" />
+</svg>

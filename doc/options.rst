@@ -1,81 +1,69 @@
 Command line
 ============
 
-The `pytest-bluezenv` plugin adds the following command-line options:
+The pytest-bluezenv plugin adds the following options.
 
 ``--kernel=<image>``
-        Kernel image (or built Linux source tree root) to
-	use.  See **test-runner(1)** and `tester.config` for required
-	kernel config.
-
-	If not provided, value from `FUNCTIONAL_TESTING_KERNEL`
-	environment variable is used. If none, no image is used.
+    Kernel image or built Linux source-tree root. When omitted,
+    ``FUNCTIONAL_TESTING_KERNEL`` supplies the value.
 
 ``--usb=hci0,hci1``
-        USB controllers to use in tests that require use of
-	real controllers.
-
-	If not provided, value from `FUNCTIONAL_TESTING_CONTROLLERS`
-	environment variable is used. If none, all USB controllers
-	with suitable permissions are considered.
+    USB controllers available for hardware tests. When omitted,
+    ``FUNCTIONAL_TESTING_CONTROLLERS`` supplies the value. Otherwise, all
+    accessible USB controllers are considered.
 
 ``--force-usb``
-        Force tests to use USB controllers instead of `btvirt`.
+    Use USB controllers instead of ``btvirt``.
 
 ``--pcie=hci0,hci1``
-        PCIe controllers to use in tests that require use of
-	real controllers.
-
-	If not provided, value from `FUNCTIONAL_TESTING_CONTROLLERS`
-	environment variable is used. If none, all PCIe controllers
-	are considered.
-
-	Passing a PCIe controller through binds it to vfio-pci for
-	the time a VM host uses it, which requires running as root.
+    PCIe controllers available for hardware tests. When omitted,
+    ``FUNCTIONAL_TESTING_CONTROLLERS`` supplies the value. Otherwise, all
+    PCIe controllers are considered. PCIe pass-through binds a controller
+    to ``vfio-pci`` while a VM host uses it and requires root.
 
 ``--force-pcie``
-        Force tests to use PCIe controllers instead of `btvirt`.
+    Use PCIe controllers instead of ``btvirt``.
 
 ``--bluez-build-dir=<path>``
-        Path to build directory where to search for BlueZ
-        executables.
+    BlueZ build directory searched for executables.
 
 ``--bluez-src-dir=<path>``
-        Path to build BlueZ source directory.
+    BlueZ source directory.
 
 ``--log-filter=[+-]<pattern>,[+-]<pattern>,...``
-        Allow/deny lists
-	for filtering logging output. The pattern is a shell glob matching
-	to the logger names.
+    Comma-separated allow and deny patterns for loggers. A pattern is a
+    shell glob. Prefix a pattern with ``+`` or ``-`` to allow or deny it.
 
 ``--no-log-reorder``
-	Don't reorder logs to timestamp order.
+    Preserve log arrival order instead of timestamp order.
 
 ``--vm-timeout=<seconds>``
-        Specify timeout for communication with VM hosts.
+    Timeout, in seconds, for communication with VM hosts.
 
 ``--vm-mem=<amount>``
-        Specify default memory for VM hosts. E.g. "512M"
+    Default VM-host memory, for example ``512M``.
 
 ``--btmon``
-        Launch btmon on all hosts to log events, and dump traffic to
-	test-bluezenv-\*.btsnoop
+    Run ``btmon`` on all VM hosts and save traffic in
+    ``test-bluezenv-*.btsnoop``.
 
 ``--kernel-build=no/use/auto/force``
-        Build a suitable kernel image from source.
+    Build a suitable kernel image from source. ``no`` disables builds,
+    ``use`` uses a cached image, ``auto`` builds when needed, and ``force``
+    rebuilds it.
 
 ``--kernel-upstream=<GIT_URL>``
-        URL for Git clone of kernel sources.
+    Kernel source Git URL used by ``--kernel-build``.
 
 ``--kernel-branch=<GIT_BRANCH>``
-        Git branch to build from.
+    Kernel branch or revision used by ``--kernel-build``.
 
 ``--no-core-backtraces``
-        Don't show backtraces from core files.
+    Do not generate backtraces for collected core files.
 
-Tests that require kernel image or USB controllers are skipped if none
-are available. Normally, tests use `btvirt`.
+Tests requiring an unavailable kernel image or hardware controller are
+skipped. Tests use ``btvirt`` otherwise.
 
-VM instances share a directory ``/run/shared`` with host machine,
-located on host usually in ``/tmp/pytest-bluezenv-*/shared-*``.  Core
-dumps etc. are copied out from it before test instance is shut down.
+Each VM host shares ``/run/shared`` with the upper tester. The upper-tester
+directory is normally ``/tmp/pytest-bluezenv-*/shared-*``. Captures and core
+dumps are copied out before the test instance stops.
