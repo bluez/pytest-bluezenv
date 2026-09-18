@@ -23,6 +23,18 @@ class Btmon(env.HostPlugin):
     Host plugin running btmon and forwarding output to logging. Parses
     timestamps output by btmon.
 
+    Args:
+        args (list): btmon command-line arguments.  Default: options
+            that also write a btsnoop capture to the shared directory.
+
+    Example:
+
+        .. code-block:: python
+
+           @host_config([Btmon()])
+           def test_trace(hosts):
+               ...
+
     """
 
     name = "btmon"
@@ -32,6 +44,13 @@ class Btmon(env.HostPlugin):
         self.end_time = None
 
     def setup(self, impl):
+        """
+        Start ``btmon`` and capture traffic to the shared directory
+        (VM side).
+
+        Args:
+            impl: lower-tester plugin manager.
+        """
         self.log = logging.getLogger(self.name)
 
         subprocess.run(["mount"])
@@ -61,6 +80,9 @@ class Btmon(env.HostPlugin):
         )
 
     def stop(self):
+        """
+        Terminate ``btmon`` and record the capture end time.
+        """
         if self.job.poll() is None:
             self.job.terminate()
 
@@ -68,6 +90,9 @@ class Btmon(env.HostPlugin):
             self.end_time = time.time_ns()
 
     def teardown(self):
+        """
+        Stop ``btmon`` and flush its parsed log (VM side).
+        """
         self.stop()
 
         self.log.info("Wait for btmon shutdown...")

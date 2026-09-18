@@ -43,7 +43,7 @@ log = logging.getLogger("env")
 
 class HostPlugin:
     """
-    Plugin to insert code to VM host side.
+    Base class for plugins that run code in a VM host.
 
     Attributes:
         name (str): unique name for the plugin
@@ -51,8 +51,18 @@ class HostPlugin:
         value (object): object to appear as HostProxy attribute on parent side.
             If None, the plugin is represented by a proxy object that does RPC
             calls. Otherwise, must be a serializable value. If it is a subclass
-            of `PluginProxy`, the method `set_connection` is called after plugin
+            of :obj:`PluginProxy`, ``set_connection`` is called after plugin
             load.
+
+    Example:
+
+        .. code-block:: python
+
+           class Ready(HostPlugin):
+               name = "ready"
+
+               def is_ready(self):
+                   return True
     """
 
     name = None
@@ -61,17 +71,14 @@ class HostPlugin:
 
     def __init__(self):
         """
-        Configure plugin (runs on parent host side).  This is
-        called at test discovery time, so should mainly store static
-        data.
+        Configure a plugin on the upper tester at collection time.
 
         """
         pass
 
     def presetup(self, config):
         """
-        Parent host-side setup, before VM environment is started.  May
-        use pytest.skip() to skip tests in case plugin cannot be set up.
+        Configure a plugin on the upper tester before VM hosts start.
 
         Args:
             config (pytest.Config): pytest configuration object
@@ -80,7 +87,7 @@ class HostPlugin:
 
     def setup(self, impl):
         """
-        VM-side setup
+        Initialise a plugin in the VM host.
 
         Args:
             impl (Implementation): plugin host object
@@ -88,21 +95,29 @@ class HostPlugin:
         pass
 
     def teardown(self):
-        """VM-side teardown"""
+        """Tear down a plugin in the VM host after its test instance."""
         pass
 
 
 class HostProxy:
     """
-    Parent host-side representation of one VM host with loadable plugins.
+    Upper-tester representation of one VM host with loadable plugins.
 
-    Plugins are usually loaded based on `host_setup`, but can also be
-    loaded during the test itself.
+    Plugins are usually loaded by :obj:`host_config`, but may also be
+    loaded during a test.
 
     Loaded plugins appear as attributes on the host proxy.
     """
 
     def __init__(self, path, timeout, name):
+        """
+        Create a VM-host proxy.
+
+        Args:
+            path (str): RPC socket path.
+            timeout (float): default RPC timeout in seconds.
+            name (str): VM-host logger name.
+        """
         self._path = path
         self._active_conn = None
         self._timeout = timeout
@@ -112,19 +127,30 @@ class HostProxy:
     def load(self, plugin: HostPlugin):
         """
         Load given plugin to the VM host synchronously.
+
+        Args:
+            plugin (HostPlugin): plugin to initialise.
         """
         self.start_load(plugin)
         self.wait_load()
 
     def set_instance_name(self, name):
+        """
+        Name this VM host instance on the parent side and on the VM.
+
+        Args:
+            name (str): instance name.
+        """
         self.instance_name = name
         self._conn.call_noreply("set_instance_name", name)
 
     def start_load(self, plugin: HostPlugin):
         """
-        Initiate loading the given plugin to the VM host.  Use
-        `wait_load` to wait for completion and make loaded plugins
-        usable.
+        Begin loading a plugin in the VM host. ``wait_load`` makes loaded
+        plugins available.
+
+        Args:
+            plugin (HostPlugin): plugin to initialise.
 
         """
         if plugin.name in self._plugins:
@@ -136,6 +162,9 @@ class HostProxy:
     def wait_load(self, timeout=None):
         """
         Wait for plugin loads to complete, and make plugins available.
+
+        Args:
+            timeout (float): maximum wait in seconds. Default: RPC timeout.
         """
         for name, value in self._conn.call("wait_load", timeout=timeout).items():
             if value is None:
@@ -179,7 +208,7 @@ class HostProxy:
 
 class PluginProxy:
     """
-    Host-side proxy for a plugin: RPC calls
+    Upper-tester RPC proxy for a VM-host plugin.
 
     Attributes:
         _name (str): plugin name
@@ -191,13 +220,41 @@ class PluginProxy:
         self._conn = None
 
     def set_connection(self, name, conn):
+        """
+        Bind the proxy to a plugin name and its RPC connection.
+
+        Args:
+            name (str): plugin name this proxy represents.
+            conn (rpc.Connection): RPC connection to the VM host. This is
+                framework setup, not normal test-side use.
+        """
         self._name = name
         self._conn = conn
 
     def __call__(self, *a, **kw):
+        """
+        Invoke the plugin's ``__call__`` method over RPC.
+
+        Args:
+            *a: positional arguments forwarded to the plugin.
+            **kw: keyword arguments forwarded to the plugin.
+
+        Returns:
+            object: return value from the VM-host plugin.
+        """
         return self._conn.call("call_plugin", self._name, "__call__", *a, **kw)
 
     def __getattr__(self, name):
+        """
+        Resolve a public VM-host plugin method as an RPC callable.
+
+        Args:
+            name (str): public plugin method name.
+
+        Returns:
+            callable: callable that forwards arguments and returns the
+            VM-host method result.
+        """
         if name.startswith("_"):
             raise AttributeError(name)
         return lambda *a, **kw: self._conn.call(

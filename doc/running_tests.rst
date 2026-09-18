@@ -1,145 +1,126 @@
 Running tests
 =============
 
-Run all tests
--------------
+Running a suite
+---------------
 
-.. code-block::
+.. code-block:: console
 
-	$ python3 -mpytest --kernel=/pathto/bzImage
+   $ python3 -mpytest --kernel=/path/to/bzImage
 
-	$ export FUNCTIONAL_TESTING_KERNEL=/pathto/bzImage
-	$ python3 -mpytest
+   $ export FUNCTIONAL_TESTING_KERNEL=/path/to/bzImage
+   $ python3 -mpytest
 
-Show output during run
-----------------------
+Live logging
+------------
 
-.. code-block::
+.. code-block:: console
 
-	$ python3 -mpytest --log-cli-level=0
+   $ python3 -mpytest --log-cli-level=0
 
-Show only specific loggers:
+Specific loggers can be selected or excluded with ``--log-filter``:
 
-.. code-block::
+.. code-block:: console
 
-	$ python3 -mpytest --log-cli-level=0 --log-filter=rpc,host
+   $ python3 -mpytest --log-cli-level=0 --log-filter=rpc,host
+   $ python3 -mpytest --log-cli-level=0 --log-filter=*.bluetoothctl
+   $ python3 -mpytest --log-cli-level=0 --log-filter=-host
+   $ python3 -mpytest --log-cli-level=0 --log-filter=host,-host.*.1
 
-	$ python3 -mpytest --log-cli-level=0 --log-filter=*.bluetoothctl
+Selecting tests
+---------------
 
-Filter out loggers:
+.. code-block:: console
 
-.. code-block::
+   $ python3 -mpytest test/functional/test_cli_simple.py::test_bluetoothctl_script_show
+   $ python3 -mpytest -k test_bluetoothctl_script_show
+   $ python3 -mpytest -k 'test_btmgmt or test_bluetoothctl'
 
-	$ python3 -mpytest --log-cli-level=0 --log-filter=-host
+Markers can exclude tests:
 
-	$ python3 -mpytest --log-cli-level=0 --log-filter=host,-host.*.1
+.. code-block:: console
 
-Run selected tests
+   $ python3 -mpytest -m "not pipewire"
+   $ python3 -mpytest -m "not xfail"
+
+Without the second expression, known failing tests run with their failures
+suppressed. The following command reruns failed tests and stops on failure:
+
+.. code-block:: console
+
+   $ python3 -mpytest -x --ff
+
+``--runxfail`` reports failures from known-failing tests:
+
+.. code-block:: console
+
+   $ python3 -mpytest --runxfail -k test_btmgmt_info
+
+USB controllers
+---------------
+
+.. code-block:: console
+
+   $ python3 -mpytest --usb=hci0,hci1
+
+   $ export FUNCTIONAL_TESTING_CONTROLLERS=hci0,hci1
+   $ python3 -mpytest -vv
+
+USB pass-through does not require root. The process needs permission to
+open each device. With ``-vv``, pytest-bluezenv reports missing permissions.
+``--force-usb`` selects USB controllers for tests that would otherwise use
+``btvirt``:
+
+.. code-block:: console
+
+   $ python3 -mpytest --usb=hci0,hci1 --force-usb
+
+PCIe controllers
+----------------
+
+.. code-block:: console
+
+   $ sudo python3 -mpytest --pcie=hci0,hci1
+
+A PCIe controller is bound to ``vfio-pci`` while a VM host uses it and
+returned to its original driver afterwards. This requires root, an enabled
+IOMMU, and an IOMMU group containing no other device. ``--force-pcie``
+selects PCIe controllers for tests that would otherwise use ``btvirt``:
+
+.. code-block:: console
+
+   $ sudo python3 -mpytest --pcie=hci0,hci1 --force-pcie
+
+Parallel execution
 ------------------
 
-.. code-block::
+pytest-xdist provides parallel execution:
 
-	$ python3 -mpytest test/functional/test_cli_simple.py::test_bluetoothctl_script_show
+.. code-block:: console
 
-	$ python3 -mpytest -k test_bluetoothctl_script_show
+   $ python3 -mpytest -n auto
 
-	$ python3 -mpytest -k 'test_btmgmt or test_bluetoothctl'
+``--dist loadgroup`` keeps tests that reuse a VM host on the same worker:
 
-Don't run tests with a given marker:
+.. code-block:: console
 
-.. code-block::
+   $ python3 -mpytest -n auto --dist loadgroup
 
-	$ python3 -mpytest -m "not pipewire"
+VM-host console
+---------------
 
-Don't run known-failing tests:
+During a running test, the following command connects to a VM-host serial
+console:
 
-.. code-block::
+.. code-block:: console
 
-	$ python3 -mpytest -m "not xfail"
+   $ python3 -mpytest_bluezenv attach
 
-Note that otherwise known-failing tests would be run, but with
-failures suppressed.
+The test normally needs to be paused, for example with ``--trace``. The
+upper tester logs an equivalent command when it starts a VM host:
 
-Run previously failed and stop on failure
------------------------------------------
+.. code-block:: console
 
-.. code-block::
+   TTY: socat /tmp/pytest-bluezenv-q658swgi/pytest-bluezenv-tty-0 STDIO,rawer
 
-	$ python3 -mpytest -x --ff
-
-Show errors from know-failing test
-----------------------------------
-
-.. code-block::
-
-	$ python3 -mpytest --runxfail -k test_btmgmt_info
-
-Redirect USB devices
---------------------
-
-.. code-block::
-
-	$ python3 -mpytest --usb=hci0,hci1
-
-	$ export FUNCTIONAL_TESTING_CONTROLLERS=hci0,hci1
-	$ python3 -mpytest -vv
-
-This does not require running as root. Changing device permissions is
-sufficient. In verbose mode (``-vv``) some instructions are printed.
-
-Run all tests using the USB controllers:
-
-.. code-block::
-
-	$ python3 -mpytest --usb=hci0,hci1 --force-usb
-
-Redirect PCIe devices
----------------------
-
-.. code-block::
-
-	$ sudo python3 -mpytest --pcie=hci0,hci1
-
-Unlike USB controllers, a PCIe controller is bound to vfio-pci for the
-time a VM host uses it, and is bound back to its own driver afterwards,
-so the tests have to be run as root. The IOMMU also has to be enabled,
-and the controller has to be alone in its IOMMU group.
-
-Run all tests using the PCIe controllers:
-
-.. code-block::
-
-	$ sudo python3 -mpytest --pcie=hci0,hci1 --force-pcie
-
-Run tests in parallel
----------------------
-
-pytest-xdist is required for parallel execution. To run:
-
-.. code-block::
-
-	$ python3 -mpytest -n auto
-
-To reduce VM setup/teardowns:
-
-.. code-block::
-
-	$ python3 -mpytest -n auto --dist loadgroup
-
-Logging in to a test VM instance
---------------------------------
-
-While test is running:
-
-.. code-block::
-
-	$ python3 -mpytest_bluezenv attach
-
-For this to be useful, usually, you need to pause the test
-e.g. by running with ``--trace`` option.
-
-To do it manually, when starting the tester will log a line like::
-
-	TTY: socat /tmp/pytest-bluezenv-q658swgi/pytest-bluezenv-tty-0 STDIO,rawer
-
-with the location of the socket where the serial is connected to.
+The command contains the serial socket path.

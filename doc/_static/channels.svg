@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 900 236"
+   width="900"
+   height="236"
+   version="1.1"
+   role="img"
+   aria-labelledby="ch-title ch-desc"
+   id="svg19"
+   sodipodi:docname="channels.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview19"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.98277778"
+     inkscape:cx="414.64104"
+     inkscape:cy="224.36405"
+     inkscape:window-width="1920"
+     inkscape:window-height="1014"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg19" />
+  <title
+     id="ch-title">Channels between the upper tester and a VM host</title>
+  <desc
+     id="ch-desc">Four channels connect the pytest process to each VM host: a bidirectional control channel for RPC, a log channel carrying guest log records to the upper tester, a serial tty for attaching a shell, and a shared 9p directory for files such as core dumps and captures.</desc>
+  <defs
+     id="defs5">
+    <linearGradient
+       id="pytest-grad"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="1">
+      <stop
+         offset="0%"
+         stop-color="#ff9f43"
+         id="stop1" />
+      <stop
+         offset="100%"
+         stop-color="#ff5252"
+         id="stop2" />
+    </linearGradient>
+    <linearGradient
+       id="bluez-grad"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="1">
+      <stop
+         offset="0%"
+         stop-color="#00c6ff"
+         id="stop3" />
+      <stop
+         offset="100%"
+         stop-color="#0072ff"
+         id="stop4" />
+    </linearGradient>
+    <marker
+       id="arrow"
+       viewBox="0 0 10 10"
+       refX="9"
+       refY="5"
+       markerWidth="7"
+       markerHeight="7"
+       orient="auto-start-reverse">
+      <path
+         d="M 0 0 L 10 5 L 0 10 z"
+         fill="#5b6470"
+         id="path4" />
+    </marker>
+    <marker
+       id="arrowb"
+       viewBox="0 0 10 10"
+       refX="9"
+       refY="5"
+       markerWidth="7"
+       markerHeight="7"
+       orient="auto-start-reverse">
+      <path
+         d="M 0 0 L 10 5 L 0 10 z"
+         fill="#0b5bd3"
+         id="path5" />
+    </marker>
+    <style
+       id="style5">
+      .card  { fill:#ffffff; stroke:#d7dbe0; stroke-width:1.5; }
+      .onbox { fill:#ffffff; font:700 16px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .onsub { fill:#ffffff; fill-opacity:.92; font:400 12px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .chip  { fill:#ffffff; stroke:#c9d3e2; stroke-width:1; }
+      .lchip { fill:#fff4ec; stroke:#f0a070; stroke-width:1.2; }
+      .chiptx{ fill:#1f2430; font:600 12.5px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .wire  { stroke:#5b6470; stroke-width:2; fill:none; }
+      .cblu  { stroke:#5aa2ff; stroke-width:2; fill:none; }
+      .chtxt { fill:#374151; font:600 12.5px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+      .chsub { fill:#6b7280; font:400 11.5px ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif; }
+    </style>
+  </defs>
+  <!-- upper tester -->
+  <rect
+     x="36"
+     y="54"
+     width="188"
+     height="152"
+     rx="14"
+     fill="url(#pytest-grad)"
+     id="rect6" />
+  <text
+     class="onbox"
+     x="130"
+     y="124"
+     text-anchor="middle"
+     id="text6">Upper tester</text>
+  <text
+     class="onsub"
+     x="130"
+     y="144"
+     text-anchor="middle"
+     id="text7">pytest</text>
+  <!-- VM host -->
+  <rect
+     x="676"
+     y="40"
+     width="188"
+     height="156"
+     rx="14"
+     fill="url(#bluez-grad)"
+     id="rect7" />
+  <text
+     class="onbox"
+     x="770"
+     y="66"
+     text-anchor="middle"
+     id="text8">VM host</text>
+  <rect
+     class="lchip"
+     x="694"
+     y="80"
+     width="152"
+     height="28"
+     rx="7"
+     id="rect8" />
+  <text
+     class="chiptx"
+     x="770"
+     y="99"
+     text-anchor="middle"
+     id="text9">lower tester</text>
+  <rect
+     class="chip"
+     x="694"
+     y="116"
+     width="152"
+     height="26"
+     rx="7"
+     id="rect9" />
+  <text
+     class="chiptx"
+     x="770"
+     y="133"
+     text-anchor="middle"
+     id="text10">bluetoothd · plugins</text>
+  <rect
+     class="chip"
+     x="694"
+     y="150"
+     width="152"
+     height="26"
+     rx="7"
+     id="rect10" />
+  <text
+     class="chiptx"
+     x="770"
+     y="167"
+     text-anchor="middle"
+     id="text11">kernel under test</text>
+  <!-- channels -->
+  <!-- control (RPC): bidirectional -->
+  <path
+     class="wire"
+     d="M 224 78 L 676 78"
+     marker-start="url(#arrow)"
+     marker-end="url(#arrow)"
+     id="path11" />
+  <text
+     class="chtxt"
+     x="450"
+     y="66"
+     text-anchor="middle"
+     id="text12">control — RPC</text>
+  <text
+     class="chsub"
+     x="450"
+     y="92"
+     text-anchor="middle"
+     id="text13">drives plugins, returns results · --vm-timeout</text>
+  <!-- log: VM -> tester -->
+  <path
+     class="cblu"
+     d="M 676 116 L 224 116"
+     marker-end="url(#arrowb)"
+     id="path13" />
+  <text
+     class="chtxt"
+     x="450"
+     y="104"
+     text-anchor="middle"
+     id="text14">log</text>
+  <text
+     class="chsub"
+     x="450"
+     y="130"
+     text-anchor="middle"
+     id="text15">guest log records, timestamped · --log-filter</text>
+  <!-- tty: bidirectional -->
+  <path
+     class="wire"
+     d="M 224 154 L 676 154"
+     marker-start="url(#arrow)"
+     marker-end="url(#arrow)"
+     id="path15" />
+  <text
+     class="chtxt"
+     x="450"
+     y="142"
+     text-anchor="middle"
+     id="text16">tty</text>
+  <text
+     class="chsub"
+     x="450"
+     y="168"
+     text-anchor="middle"
+     id="text17">root shell · pytest_bluezenv attach</text>
+  <!-- shared: bidirectional -->
+  <path
+     class="wire"
+     d="M 224 186 L 676 186"
+     marker-start="url(#arrow)"
+     marker-end="url(#arrow)"
+     id="path17" />
+  <text
+     class="chtxt"
+     x="450"
+     y="200"
+     text-anchor="middle"
+     id="text18">shared</text>
+  <text
+     class="chsub"
+     x="450"
+     y="214"
+     text-anchor="middle"
+     id="text19">9p directory — core dumps, btmon captures</text>
+</svg>

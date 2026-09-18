@@ -7,8 +7,8 @@ VM configuration
 .. autosummary::
    :toctree: api
 
-   pytest_bluezenv.host_config
-   pytest_bluezenv.parametrized_host_config
+   ~pytest_bluezenv.host_config
+   ~pytest_bluezenv.parametrized_host_config
 
 Fixtures
 --------
@@ -16,8 +16,8 @@ Fixtures
 .. autosummary::
    :toctree: api
 
-   pytest_bluezenv.hosts
-   pytest_bluezenv.hosts_once
+   ~pytest_bluezenv.hosts
+   ~pytest_bluezenv.hosts_once
 
 Host plugins
 ------------
@@ -25,19 +25,27 @@ Host plugins
 .. autosummary::
    :toctree: api
 
-   pytest_bluezenv.HostPlugin
-   pytest_bluezenv.Agent
-   pytest_bluezenv.Bdaddr
-   pytest_bluezenv.Bluetoothctl
-   pytest_bluezenv.Bluetoothd
-   pytest_bluezenv.Btmon
-   pytest_bluezenv.Call
-   pytest_bluezenv.DbusSession
-   pytest_bluezenv.DbusSystem
-   pytest_bluezenv.Obexd
-   pytest_bluezenv.Pexpect
-   pytest_bluezenv.Rcvbuf
-   pytest_bluezenv.RemoteError
+   ~pytest_bluezenv.HostPlugin
+   ~pytest_bluezenv.Agent
+   ~pytest_bluezenv.Bdaddr
+   ~pytest_bluezenv.Bluetoothctl
+   ~pytest_bluezenv.Bluetoothd
+   ~pytest_bluezenv.Btmon
+   ~pytest_bluezenv.Call
+   ~pytest_bluezenv.DbusSession
+   ~pytest_bluezenv.DbusSystem
+   ~pytest_bluezenv.Obexd
+   ~pytest_bluezenv.Pexpect
+   ~pytest_bluezenv.Rcvbuf
+
+Exceptions
+----------
+
+.. autosummary::
+   :toctree: api
+
+   ~pytest_bluezenv.RemoteError
+   ~pytest_bluezenv.rpc.RemoteTimeoutError
 
 Utilities
 ---------
@@ -45,44 +53,57 @@ Utilities
 .. autosummary::
    :toctree: api
 
-   pytest_bluezenv.LogStream
-   pytest_bluezenv.get_bdaddr
-   pytest_bluezenv.get_dbus
-   pytest_bluezenv.find_exe
-   pytest_bluezenv.mainloop_assert
-   pytest_bluezenv.mainloop_invoke
-   pytest_bluezenv.mainloop_wrap
-   pytest_bluezenv.quoted
-   pytest_bluezenv.run
-   pytest_bluezenv.wait_until
-   pytest_bluezenv.CoredumpWarning
-   pytest_bluezenv.KernelBugWarning
+   ~pytest_bluezenv.LogStream
+   ~pytest_bluezenv.get_bdaddr
+   ~pytest_bluezenv.get_dbus
+   ~pytest_bluezenv.find_exe
+   ~pytest_bluezenv.mainloop_assert
+   ~pytest_bluezenv.mainloop_invoke
+   ~pytest_bluezenv.mainloop_wrap
+   ~pytest_bluezenv.quoted
+   ~pytest_bluezenv.run
+   ~pytest_bluezenv.wait_until
+   ~pytest_bluezenv.CoredumpWarning
+   ~pytest_bluezenv.KernelBugWarning
+   ~pytest_bluezenv.SanitizerWarning
 
 .. autosummary::
    :toctree: api
 
-   pytest_bluezenv.Event
-   pytest_bluezenv.EventPluginMixin
-   pytest_bluezenv.dbus_service_event_method
+   ~pytest_bluezenv.Event
+   ~pytest_bluezenv.EventPluginMixin
+   ~pytest_bluezenv.dbus_service_event_method
 
+
+Host proxies
+------------
+
+The upper-tester objects used to access VM-host plugins. ``host.<name>``
+is a :obj:`~pytest_bluezenv.PluginProxy` unless a plugin exposes a value
+through :obj:`~pytest_bluezenv.HostPlugin.value`.
+
+.. autosummary::
+   :toctree: api
+
+   ~pytest_bluezenv.HostProxy
+   ~pytest_bluezenv.PluginProxy
 
 Internals
 ---------
 
-.. autosummary::
-   :toctree: api
-
-   pytest_bluezenv.HostProxy
-   pytest_bluezenv.PluginProxy
-
-Internal fixtures:
+Internal fixtures, used by :obj:`~pytest_bluezenv.host_config`.
 
 .. autosummary::
    :toctree: api
 
-   pytest_bluezenv.host_setup
-   pytest_bluezenv.kernel
-   pytest_bluezenv.hw_indices
-   pytest_bluezenv.vm
-   pytest_bluezenv.vm_once
-   pytest_bluezenv.vm_setup
+   ~pytest_bluezenv.host_setup
+   ~pytest_bluezenv.kernel
+   ~pytest_bluezenv.hw_indices
+   ~pytest_bluezenv.vm
+   ~pytest_bluezenv.vm_once
+   ~pytest_bluezenv.vm_setup
+
+.. toctree::
+   :hidden:
+
+   api-internal
