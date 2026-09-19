@@ -752,7 +752,9 @@ class LogNameFilter(logging.Filter):
 
     def _re(self, name):
         pat = fnmatch.translate(name)
-        return f"{pat}$|{pat}\\."
+        if pat.endswith(r"\z") or pat.endswith(r"\Z"):
+            pat = pat[:-2]
+        return f"{pat}(?:\\Z|\\.)"
 
     def filter(self, record):
         if self.deny is not None and self.deny.match(record.name):
