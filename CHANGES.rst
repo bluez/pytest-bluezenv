@@ -3,6 +3,8 @@ Development:
      Tests not using bluetoothd must now power it on explicitly.
    - *(Backward incompatible)* Rename ``usb_indices`` fixture to
      ``hw_indices``.
+   - *(Backward incompatible)* For Call ``sync=False`` its `.wait()`
+     now raises possible exceptions, instead of returning them.
    - Add PCIe controller passthrough with --pcie and --force-pcie.
 
 v0.1.9:
