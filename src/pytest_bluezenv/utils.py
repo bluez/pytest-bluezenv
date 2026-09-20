@@ -43,6 +43,7 @@ __all__ = [
     "LogStream",
     "KernelBugWarning",
     "SanitizerWarning",
+    "default_timeout",
 ]
 
 
@@ -55,6 +56,16 @@ log = logging.getLogger(f"run")
 
 OUT = 5
 logging.addLevelName(OUT, "OUT")
+
+
+def default_timeout():
+    """Return a default timeout, chosen to deal with VM load.
+
+    Returns:
+        float: A default timeout that scales with VM timeout.
+
+    """
+    return float(DEFAULT_TIMEOUT)
 
 
 def quoted(args):

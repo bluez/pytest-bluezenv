@@ -54,6 +54,7 @@ Utilities
    :toctree: api
 
    ~pytest_bluezenv.LogStream
+   ~pytest_bluezenv.default_timeout
    ~pytest_bluezenv.get_bdaddr
    ~pytest_bluezenv.get_dbus
    ~pytest_bluezenv.find_exe
