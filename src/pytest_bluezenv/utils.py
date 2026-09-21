@@ -43,6 +43,7 @@ __all__ = [
     "LogStream",
     "KernelBugWarning",
     "SanitizerWarning",
+    "default_timeout",
 ]
 
 
@@ -55,6 +56,16 @@ log = logging.getLogger(f"run")
 
 OUT = 5
 logging.addLevelName(OUT, "OUT")
+
+
+def default_timeout():
+    """Return a default timeout, chosen to deal with VM load.
+
+    Returns:
+        float: A default timeout that scales with VM timeout.
+
+    """
+    return float(DEFAULT_TIMEOUT)
 
 
 def quoted(args):
@@ -752,7 +763,9 @@ class LogNameFilter(logging.Filter):
 
     def _re(self, name):
         pat = fnmatch.translate(name)
-        return f"{pat}$|{pat}\\."
+        if pat.endswith(r"\z") or pat.endswith(r"\Z"):
+            pat = pat[:-2]
+        return f"{pat}(?:\\Z|\\.)"
 
     def filter(self, record):
         if self.deny is not None and self.deny.match(record.name):
@@ -815,10 +828,13 @@ class LogReorderFilter(logging.Filter):
             self._records[id(record)] = record
             self._pos = max(self._pos, ts)
 
-        self._delay = max(self._delay, 2 * (time.time_ns() - ts))
+            self._delay = max(self._delay, 2 * (time.time_ns() - ts))
 
-    def _flush(self, force=False):
+    def _flush(self, force=False, now=False):
         with self._lock:
+            if now:
+                self._pos = max(self._pos, time.time_ns())
+
             while self._queue and (
                 self._queue[0][0] + self._delay < self._pos or force
             ):
@@ -867,7 +883,7 @@ class LogReorderFilter(logging.Filter):
                 h.removeFilter(f)
                 f._flush(force=True)
 
-        if cls.FLUSH_THREAD is not None and cls.FLUSH_ITEMS:
+        if cls.FLUSH_THREAD is not None and not cls.FLUSH_ITEMS:
             cls.FLUSH_END.set()
             cls.FLUSH_THREAD.join()
 
@@ -876,7 +892,7 @@ class LogReorderFilter(logging.Filter):
         # Timed flushing
         while not cls.FLUSH_END.wait(1.0):
             for f in cls.FLUSH_ITEMS:
-                f._flush()
+                f._flush(now=True)
 
 
 class OopsTracker:

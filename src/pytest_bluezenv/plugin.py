@@ -216,7 +216,7 @@ def pytest_configure(config):
     env.Environment.DEFAULT_MEM = config.option.vm_mem or config.getini("vm_mem")
 
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
-    logfile = config.getini("log_file")
+    logfile = config.option.log_file or config.getini("log_file")
     if worker_id is not None and logfile:
         logfile = logfile.replace(".log", "") + f"-{worker_id}.log"
         with open(logfile, "wb"):
@@ -516,7 +516,7 @@ def hw_indices(pytestconfig):
         messages += msg
 
     # Order messages of valid indices to front
-    messages.sort(key=lambda x: x == "")
+    messages.sort(key=lambda x: x != "")
 
     return indices, messages
 
