@@ -45,15 +45,6 @@ class HostPlugin:
     """
     Base class for plugins that run code in a VM host.
 
-    Attributes:
-        name (str): unique name for the plugin
-        depends (tuple[HostPlugin]): plugins to be loaded before this one
-        value (object): object to appear as HostProxy attribute on parent side.
-            If None, the plugin is represented by a proxy object that does RPC
-            calls. Otherwise, must be a serializable value. If it is a subclass
-            of :obj:`PluginProxy`, ``set_connection`` is called after plugin
-            load.
-
     Example:
 
         .. code-block:: python
@@ -63,6 +54,16 @@ class HostPlugin:
 
                def is_ready(self):
                    return True
+
+    Attributes:
+        name (str): unique name for the plugin
+        depends (tuple[HostPlugin]): plugins to be loaded before this one
+        value (object): object to appear as HostProxy attribute on parent side.
+            If None, the plugin is represented by a proxy object that does RPC
+            calls. Otherwise, must be a serializable value. If it is a subclass
+            of :obj:`~pytest_bluezenv.PluginProxy`, ``set_connection`` is
+            called after plugin load.
+
     """
 
     name = None
@@ -90,7 +91,7 @@ class HostPlugin:
         Initialise a plugin in the VM host.
 
         Args:
-            impl (Implementation): plugin host object
+            impl: lower-tester plugin manager.
         """
         pass
 
@@ -103,10 +104,19 @@ class HostProxy:
     """
     Upper-tester representation of one VM host with loadable plugins.
 
-    Plugins are usually loaded by :obj:`host_config`, but may also be
-    loaded during a test.
+    Plugins are usually loaded by :obj:`~pytest_bluezenv.host_config`, but may
+    also be loaded during a test.
 
     Loaded plugins appear as attributes on the host proxy.
+
+    Example:
+
+        .. code-block:: python
+
+           def test_bluetoothctl_show(hosts):
+               host = hosts[0]
+               host.load(Bluetoothctl())
+               host.bluetoothctl.send("show\\n")
     """
 
     def __init__(self, path, timeout, name, progress_reporter=None):
@@ -305,10 +315,19 @@ class Implementation:
         self.load_error = False
 
     def set_instance_name(self, name):
+        """
+        Set name for this tester instance
+        """
         self.instance_name = name
         socket.sethostname(name)
 
     def start_load(self, plugin):
+        """
+        Start loading a plugin
+
+        Args:
+            plugin (HostPlugin): plugin to load
+        """
         try:
             log.info(f"Plugin {plugin.name} load")
             plugin.setup(self)
@@ -320,6 +339,12 @@ class Implementation:
         log.info(f"Plugin {plugin.name} ready")
 
     def wait_load(self):
+        """
+        Wait until all plugins are loaded.
+
+        Returns:
+            dict: Mapping ``{name: plugin.value}``
+        """
         if self.load_error:
             raise RuntimeError("load failed")
         log.debug(f"Plugins ready")
@@ -339,9 +364,25 @@ class Implementation:
         return True
 
     def call_plugin(self, name, method, *a, **kw):
+        """
+        Call a plugin method
+
+        Args:
+            name (str): plugin name
+            method (str): method name
+            *a: call arguments
+            **kw: call keyword arguments
+
+        Returns:
+            object: plugin method call return value
+
+        """
         return getattr(self.plugins[name], method)(*a, **kw)
 
     def teardown(self):
+        """
+        Unload all plugins
+        """
         success = True
         while self.plugin_order:
             name = self.plugin_order[-1]

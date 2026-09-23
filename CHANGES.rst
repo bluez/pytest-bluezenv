@@ -18,6 +18,12 @@ Development:
      the selected tests' VM configurations.
    - Add ``expect_all`` to ``Pexpect`` and ``Bluetoothctl``, waiting for
      several patterns in any order.
+   - Add ``reject`` patterns to ``Pexpect`` and ``Bluetoothctl``,
+     aborting waits when unwanted output is seen.
+   - Add ``--btvirt-debug`` option to enable debug output from
+     ``btvirt``.
+   - Add ``default_timeout`` utility returning a default timeout that
+     scales with VM load.
 
 v0.1.9:
    - Add configurable default VM memory with --vm-mem.
