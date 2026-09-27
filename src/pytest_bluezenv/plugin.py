@@ -166,6 +166,11 @@ def pytest_addoption(parser):
         action="store_true",
         help="Launch btmon on all hosts to log events, and dump traffic to test-bluezenv-*.btsnoop",
     )
+    group.addoption(
+        "--btvirt-debug",
+        action="store_true",
+        help="Enable debug output from btvirt",
+    )
 
     # host_plugins.Rcvbuf:
     parser.addini(
@@ -795,6 +800,7 @@ def _vm_impl(request, kernel, num_hosts, hw, mem, controller):
         hw_indices=hw_indices,
         mem=mem,
         controller=controller,
+        btvirt_debug=config.option.btvirt_debug,
         timeout=utils.DEFAULT_TIMEOUT,
         progress_reporter=PROGRESS_REPORTER,
     ) as vm:

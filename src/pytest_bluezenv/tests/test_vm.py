@@ -167,7 +167,7 @@ CONTROLLER_FEATURES = r"""
 
 
 def test_vm_controller_features(pytester, vm_args):
-    result = run_vm(pytester, vm_args, CONTROLLER_FEATURES, "--btmon")
+    result = run_vm(pytester, vm_args, CONTROLLER_FEATURES, "--btmon", "--btvirt-debug")
     result.assert_outcomes(passed=4)
 
     # --btmon / Btmon dump was captured and copied out of the shared dir.

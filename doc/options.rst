@@ -47,6 +47,9 @@ The pytest-bluezenv plugin adds the following options.
     Run ``btmon`` on all VM hosts and save traffic in
     ``test-bluezenv-*.btsnoop``.
 
+``--btvirt-debug``
+    Enable debug output from ``btvirt``.
+
 ``--bluezenv-progress=auto/on/off``
     Report slow host RPC calls. ``auto`` (the default) reports only on an
     interactive terminal; ``on`` also emits periodic lines when there is

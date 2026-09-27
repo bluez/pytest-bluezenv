@@ -638,6 +638,7 @@ class Environment:
         timeout=20,
         mem=None,
         controller=True,
+        btvirt_debug=False,
         progress_reporter=None,
     ):
         if Path(kernel).is_dir():
@@ -657,6 +658,7 @@ class Environment:
         self.reuse_group = None
         self.mem = mem
         self.controller = controller
+        self.btvirt_debug = btvirt_debug
         self.progress_reporter = progress_reporter
 
         if hw_indices is None:
@@ -780,6 +782,8 @@ class Environment:
         logger = self._add_log("btvirt")
 
         cmd = [exe, f"--server={self.path}"]
+        if self.btvirt_debug:
+            cmd.append("-d")
         log.info("Starting btvirt: {}".format(utils.quoted(cmd)))
 
         job = Popen(
