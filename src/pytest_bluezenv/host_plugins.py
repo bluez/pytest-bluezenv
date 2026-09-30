@@ -218,9 +218,7 @@ class Call(env.HostPlugin):
                 ``sync=False``.
             """
             if kw.pop("sync", True):
-                return self._conn.call(
-                    "call_plugin", self._name, "__call__", func, *a, **kw
-                )
+                return self._call("__call__", func, *a, **kw)
             else:
                 self._conn.call_noreply(
                     "call_plugin", self._name, "call_async", func, *a, **kw
@@ -616,6 +614,9 @@ class Pexpect(env.HostPlugin):
 
         self.log.info("Spawn {}".format(utils.quoted(cmd)))
 
+        # Note: pexpect.spawn doesn't work under load: using a PTY
+        # appears to cause some messages be not received by the
+        # spawned program, bluetoothctl at least.
         ctl = pexpect.popen_spawn.PopenSpawn(
             cmd,
             logfile=self.log_stream.stream,
@@ -645,22 +646,43 @@ class Pexpect(env.HostPlugin):
         ctl.kill(signal.SIGTERM)
         del self.ctls[ctl_id]
 
-    def expect(self, ctl_id, *a, **kw):
+    def _expect(self, ctl, pattern, *a, reject=None, **kw):
+        if reject is None:
+            reject = []
+        if not isinstance(pattern, (list, tuple)):
+            pattern = [pattern]
+
+        reject = list(reject)
+        idx = ctl.expect(reject + list(pattern), *a, **kw)
+        if idx < len(reject):
+            text = ctl.match.group(0)
+            if isinstance(text, bytes):
+                text = text.decode(errors="replace")
+            raise AssertionError(f"Output matched reject pattern: {text}")
+
+        self.log.debug("match found")
+        return idx - len(reject), ctl.match.groups()
+
+    def expect(self, ctl_id, *a, reject=None, **kw):
         """
         Wait for a pattern in one process' output.
 
         Args:
             ctl_id (int): spawned-process identifier.
             *a: positional arguments passed to ``pexpect.expect``.
+            reject (sequence): regular expressions that abort the
+                wait. If one matches before an expected pattern, an
+                ``AssertionError`` carrying the matched output is
+                raised instead of waiting for the timeout. It surfaces
+                over RPC as :obj:`~pytest_bluezenv.RemoteError`.
             **kw: keyword arguments passed to ``pexpect.expect``.
 
         Returns:
             tuple: ``(index, groups)`` of the match, as in pexpect.
+            The index is relative to the expected patterns.
         """
         ctl = self.ctls[ctl_id]
-        ret = ctl.expect(*a, **kw)
-        self.log.debug("match found")
-        return ret, ctl.match.groups()
+        return self._expect(self.ctls[ctl_id], *a, reject=reject, **kw)
 
     def send(self, ctl_id, *a, **kw):
         """
@@ -676,6 +698,48 @@ class Pexpect(env.HostPlugin):
         """
         ctl = self.ctls[ctl_id]
         return ctl.send(*a, **kw)
+
+    def expect_all(self, ctl_id, patterns, reject=None, timeout=None, **kw):
+        """Wait for all the given patterns in one process' output, in any
+        order.
+
+        Args:
+            ctl_id (int): spawned-process identifier.
+            patterns (sequence): regular expressions to wait for.
+            reject (sequence): regular expressions aborting every
+                round; see :obj:`~pytest_bluezenv.Pexpect.expect`.
+            timeout (float): overall time budget in seconds for all the
+                patterns, or None to use default.
+            **kw: keyword arguments passed to each ``pexpect.expect``.
+
+        Returns:
+            list: groups of each pattern's match, in the order of
+            ``patterns``.
+
+        """
+        ctl = self.ctls[ctl_id]
+
+        if timeout is None:
+            timeout = utils.DEFAULT_TIMEOUT
+        deadline = time.monotonic() + timeout
+
+        pending = list(enumerate(patterns))
+        groups = [None] * len(patterns)
+
+        while pending:
+            watched = [pattern for _, pattern in pending]
+
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Timeout reached")
+                kw = dict(kw, timeout=remaining)
+
+            idx, m = self._expect(ctl, watched, reject=reject, **kw)
+            groups[pending.pop(idx)[0]] = m
+            self.log.debug("match found")
+
+        return groups
 
     class Proxy(env.PluginProxy):
         """
@@ -693,7 +757,7 @@ class Pexpect(env.HostPlugin):
             Returns:
                 Pexpect.CtlProxy: handle to the spawned process.
             """
-            ctl_id = self._conn.call("call_plugin", self._name, "spawn", cmd)
+            ctl_id = self._call("spawn", cmd)
             return Pexpect.CtlProxy(self, ctl_id)
 
     class CtlProxy:
@@ -715,8 +779,7 @@ class Pexpect(env.HostPlugin):
             self.ctl_id = ctl_id
 
         def __getattr__(self, name):
-            method = getattr(self._plugin, name)
-            return lambda *a, **kw: method(self.ctl_id, *a, **kw)
+            return lambda *a, **kw: self._plugin._call(name, self.ctl_id, *a, **kw)
 
         def __enter__(self):
             return self
@@ -727,7 +790,14 @@ class Pexpect(env.HostPlugin):
 
 class Bluetoothctl(env.HostPlugin):
     """
-    Host plugin for starting and controlling ``bluetoothctl`` with pexpect.
+    Host plugin for starting and controlling one ``bluetoothctl``
+    process with pexpect.
+
+    Args:
+        args (sequence): extra command-line arguments for
+            ``bluetoothctl``.
+
+    Depends on :obj:`~pytest_bluezenv.Bluetoothd`.
 
     Example:
 
@@ -736,10 +806,24 @@ class Bluetoothctl(env.HostPlugin):
            @host_config([Bluetoothctl()])
            def test_info(hosts):
                hosts[0].bluetoothctl.send("show\\n")
+
+    Example:
+
+        .. code-block:: python
+
+           # Accept pairing and authorize services without prompting
+           @host_config([Bluetoothctl(args=("-a", "auto:NoInputNoOutput"))])
+           def test_pair(hosts):
+               ...
     """
 
     name = "bluetoothctl"
     depends = [Bluetoothd()]
+
+    def __init__(self, args=()):
+        super().__init__()
+
+        self.args = tuple(args)
 
     def presetup(self, config):
         """
@@ -757,39 +841,54 @@ class Bluetoothctl(env.HostPlugin):
         Args:
             impl: lower-tester plugin manager.
         """
-        from pexpect.popen_spawn import PopenSpawn
+        self._pexpect = Pexpect()
+        self._pexpect.name = self.name
+        self._pexpect.setup(impl)
 
-        self.log = logging.getLogger(self.name)
-        self.log_stream = utils.LogStream(self.name)
-
-        # Note: pexpect.spawn doesn't work under load: using a PTY
-        # appears to cause some messages be not received by
-        # bluetoothctl
-        self.ctl = pexpect.popen_spawn.PopenSpawn(
-            self.exe, logfile=self.log_stream.stream, timeout=utils.DEFAULT_TIMEOUT
-        )
+        self._ctl_id = self._pexpect.spawn([self.exe] + list(self.args))
 
     def teardown(self):
         """
         Close the ``bluetoothctl`` process (VM side).
         """
-        self.ctl.sendeof()
-        self.ctl.kill(signal.SIGTERM)
+        self._pexpect.close(self._ctl_id)
 
-    def expect(self, *a, **kw):
+    def expect(self, *a, reject=None, **kw):
         """
         Wait for a pattern in the ``bluetoothctl`` output.
 
         Args:
             *a: positional arguments passed to ``pexpect.expect``.
+            reject (sequence): regular expressions aborting the wait;
+                see :obj:`~pytest_bluezenv.Pexpect.expect`.
             **kw: keyword arguments passed to ``pexpect.expect``.
 
         Returns:
             tuple: ``(index, groups)`` of the match, as in pexpect.
+            The index is relative to the expected patterns.
         """
-        ret = self.ctl.expect(*a, **kw)
-        self.log.debug("match found")
-        return ret, self.ctl.match.groups()
+        return self._pexpect.expect(self._ctl_id, *a, reject=reject, **kw)
+
+    def expect_all(self, patterns, reject=None, timeout=None, **kw):
+        """
+        Wait for all the given patterns in the ``bluetoothctl`` output,
+        in any order.
+
+        Args:
+            patterns (sequence): regular expressions to wait for.
+            reject (sequence): regular expressions aborting every
+                round; see :obj:`~pytest_bluezenv.Pexpect.expect`.
+            timeout (float): overall time budget in seconds for all the
+                patterns, or None to use the process timeout per round.
+            **kw: keyword arguments passed to each ``pexpect.expect``.
+
+        Returns:
+            list: groups of each pattern's match, in the order of
+            ``patterns``.
+        """
+        return self._pexpect.expect_all(
+            self._ctl_id, patterns, reject=reject, timeout=timeout, **kw
+        )
 
     def send(self, *a, **kw):
         """
@@ -802,7 +901,7 @@ class Bluetoothctl(env.HostPlugin):
         Returns:
             int: number of bytes sent.
         """
-        return self.ctl.send(*a, **kw)
+        return self._pexpect.send(self._ctl_id, *a, **kw)
 
 
 HOST_SETUPS = 0

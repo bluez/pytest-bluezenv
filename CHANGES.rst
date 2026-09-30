@@ -6,6 +6,18 @@ Development:
    - *(Backward incompatible)* For Call ``sync=False`` its `.wait()`
      now raises possible exceptions, instead of returning them.
    - Add PCIe controller passthrough with --pcie and --force-pcie.
+   - Add ``LeAdvertiser`` host plugin for connectable LE advertisements.
+   - Add ``Agent.device_get`` and ``Agent.device_set`` helpers for
+     ``org.bluez.Device1`` properties.
+   - Add progress reporting for slow host RPC calls with
+     ``--bluezenv-progress``.
+   - Expose ``bluez_src_dir`` for locating files in the BlueZ source
+     tree given by ``--bluez-src-dir``.
+   - Add ``args`` to ``Bluetoothctl`` for extra command-line options.
+   - Limit pytest-xdist ``-n auto`` workers using the memory needed by
+     the selected tests' VM configurations.
+   - Add ``expect_all`` to ``Pexpect`` and ``Bluetoothctl``, waiting for
+     several patterns in any order.
 
 v0.1.9:
    - Add configurable default VM memory with --vm-mem.

@@ -26,13 +26,20 @@ def test_options_registered(pytester):
     assert config.getoption("log_filter") == ["+a,-b"]  # action=append
     assert config.getoption("kernel_build") == "use"  # default
 
-    for flag in ("btmon", "force_usb", "force_pcie", "no_log_reorder"):
+    for flag in (
+        "btmon",
+        "btvirt_debug",
+        "force_usb",
+        "force_pcie",
+        "no_log_reorder",
+    ):
         assert config.getoption(flag) in (None, False)
 
 
 def test_flag_options_store_true(pytester):
-    config = pytester.parseconfig(*PLUGIN, "--btmon")
-    assert config.getoption("btmon") is True
+    config = pytester.parseconfig(*PLUGIN, "--btmon", "--btvirt-debug")
+    assert config.getoption("btmon")
+    assert config.getoption("btvirt_debug")
 
 
 def test_ini_defaults(pytester):

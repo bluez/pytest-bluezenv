@@ -27,6 +27,23 @@ Specific loggers can be selected or excluded with ``--log-filter``:
    $ python3 -mpytest --log-cli-level=0 --log-filter=-host
    $ python3 -mpytest --log-cli-level=0 --log-filter=host,-host.*.1
 
+Show slow RPC calls
+-------------------
+
+.. code-block:: console
+
+   $ python3 -mpytest --bluezenv-progress=on
+
+A slow host RPC call is shown on the line below the test:
+
+.. code-block:: text
+
+   test_bluetoothd.py::test_read_feature                WAITING
+   host.0.0: bluetoothd.call("request", timeout=150) [55s, 95s left]
+
+The line is truncated to the terminal width. The default ``auto`` reports
+only on a terminal; ``on`` also emits whole lines when there is none.
+
 Selecting tests
 ---------------
 
@@ -105,6 +122,12 @@ pytest-xdist provides parallel execution:
 .. code-block:: console
 
    $ python3 -mpytest -n auto --dist loadgroup
+
+With ``-n auto``, the worker count is limited by the memory available and
+the selected tests' VM configurations. Pytest-bluezenv collects the tests
+once before starting workers to estimate their maximum VM memory. The
+workers collect the tests again as usual. An explicit worker count, such
+as ``-n 4``, is not adjusted.
 
 VM-host console
 ---------------

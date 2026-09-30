@@ -34,6 +34,7 @@ Host plugins
    ~pytest_bluezenv.Call
    ~pytest_bluezenv.DbusSession
    ~pytest_bluezenv.DbusSystem
+   ~pytest_bluezenv.LeAdvertiser
    ~pytest_bluezenv.Obexd
    ~pytest_bluezenv.Pexpect
    ~pytest_bluezenv.Rcvbuf
@@ -45,7 +46,7 @@ Exceptions
    :toctree: api
 
    ~pytest_bluezenv.RemoteError
-   ~pytest_bluezenv.rpc.RemoteTimeoutError
+   ~pytest_bluezenv.RemoteTimeoutError
 
 Utilities
 ---------
@@ -54,6 +55,7 @@ Utilities
    :toctree: api
 
    ~pytest_bluezenv.LogStream
+   ~pytest_bluezenv.bluez_src_dir
    ~pytest_bluezenv.default_timeout
    ~pytest_bluezenv.get_bdaddr
    ~pytest_bluezenv.get_dbus

@@ -312,3 +312,51 @@ main loop.
 
 :obj:`~pytest_bluezenv.Agent` and the D-Bus plugins already use the main
 loop. A custom plugin that uses D-Bus directly needs the same arrangement.
+
+
+LE advertising
+--------------
+
+In LE-only mode ``bluetoothd`` does not advertise the host by itself.
+Add a :obj:`~pytest_bluezenv.LeAdvertiser` to make a host discoverable
+and connectable by a peer:
+
+.. code-block:: python
+
+   from pytest_bluezenv import Bluetoothd, LeAdvertiser, host_config
+
+   LE_CONF = "[General]\nControllerMode = le\n"
+
+   @host_config(
+       [Bluetoothd(conf=LE_CONF)],
+       [Bluetoothd(conf=LE_CONF), LeAdvertiser(service_uuids=["180d"])],
+   )
+   def test_le_service(hosts):
+       client, server = hosts
+
+:obj:`~pytest_bluezenv.LeAdvertiser` registers a minimal connectable
+``org.bluez.LEAdvertisement1`` object on ``/org/bluez/hci0``. Its
+``service_uuids``, advertisement type, adapter path, object index, and
+discoverability are configurable through its constructor.
+
+
+Agent device properties
+-----------------------
+
+The :obj:`~pytest_bluezenv.Agent` plugin provides synchronous property
+access for both the local adapter and a discovered remote device. Device
+operations take the remote device address, which is resolved to its
+current BlueZ object path:
+
+.. code-block:: python
+
+   host.agent.device_set(peer.bdaddr, "Trusted", True)
+   assert host.agent.device_get(peer.bdaddr, "Trusted")
+
+Use :obj:`~pytest_bluezenv.Agent.adapter_get` and
+:obj:`~pytest_bluezenv.Agent.adapter_set` for ``org.bluez.Adapter1``
+properties, and :obj:`~pytest_bluezenv.Agent.device_get` and
+:obj:`~pytest_bluezenv.Agent.device_set` for ``org.bluez.Device1``
+properties. Use :obj:`~pytest_bluezenv.Agent.adapter_method` or
+:obj:`~pytest_bluezenv.Agent.device_method` when the D-Bus operation has
+an async reply event that should be handled with ``host.agent.expect()``.
