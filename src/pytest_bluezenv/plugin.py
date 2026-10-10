@@ -87,7 +87,7 @@ def pytest_addoption(parser):
     )
     parser.addini(
         "bluezenv_progress",
-        "Show progress for slow RPC calls (auto/on/off)",
+        "Show progress for slow RPC calls (auto/on/off/yes/no)",
         default="off",
     )
     group.addoption(
