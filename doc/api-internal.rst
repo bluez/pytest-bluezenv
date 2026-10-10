@@ -14,3 +14,8 @@ API Internals
 .. autoclass:: pytest_bluezenv.Pexpect.CtlProxy
    :members:
 
+.. autoclass:: pytest_bluezenv.rpc.Connection
+   :members:
+
+.. autoclass:: pytest_bluezenv.env.Implementation
+   :members:

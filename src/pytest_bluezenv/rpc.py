@@ -34,10 +34,6 @@ class RemoteError(Exception):
     """
     Exception raised in a VM host and passed through RPC.
 
-    Attributes:
-        exc (BaseException): original VM-host exception.
-        traceback (str): VM-host traceback.
-
     Example:
 
        .. code-block::
@@ -49,6 +45,10 @@ class RemoteError(Exception):
           except RemoteError as exc:
               print(exc.traceback)
               original_exception = exc.exc
+
+    Attributes:
+        exc (BaseException): original VM-host exception.
+        traceback (str): VM-host traceback.
 
     """
 
@@ -360,12 +360,46 @@ class Connection:
             return exc.value
 
     def call_noreply(self, method, *a, **kw):
+        """
+        Make RPC method call with no reply.
+
+        Invokes a corresponding method of the implementation,
+        usually :obj:`~pytest_bluezenv.env.Implementation`.
+
+        Args:
+            method (str): Method name
+            *a: Arguments passed to method
+            **kw: Keyword arguments passed to method.
+            timeout (float | None): keyword argument, call timeout if
+                different from default
+
+        """
         timeout = kw.pop("timeout", None)
 
         self.log.info(f"client: (noreply) {method} {a} {kw}")
         self._send("call-noreply", method=str(method), a=a, kw=kw, timeout=timeout)
 
     def call(self, method, *a, **kw):
+        """
+        Make RPC method call.
+
+        Invokes a corresponding method of the implementation,
+        usually :obj:`~pytest_bluezenv.env.Implementation`.
+
+        Args:
+            method (str): Method name
+            *a: Arguments passed to method
+            **kw: Keyword arguments passed to method.
+            timeout (float | None): keyword argument, call timeout if
+                different from default
+
+        Returns:
+            object: return value of the method call
+
+        Raises:
+            RemoteError: if remote side threw an exception
+            RemoteTimeoutError: if call timed out
+        """
         timeout = kw.pop("timeout", None)
 
         self.log.info(f"client: {method} {a} {kw}")
@@ -381,7 +415,7 @@ class Connection:
 
     def close(self):
         """
-        Close connection synchronously
+        Close connection synchronously, via `close_start` + `close_finish`.
         """
         try:
             self.close_start()
@@ -390,7 +424,7 @@ class Connection:
 
     def close_start(self):
         """
-        Initiate connection close
+        Start graceful connection close.
         """
         self.log.info(f"client: quit")
         if self._close_async is not None:
@@ -406,7 +440,10 @@ class Connection:
 
     def close_finish(self, force=False):
         """
-        Finish connection close
+        Complete asynchronous connection close to complete
+
+        Args:
+            force (bool): Close connection immediately without waiting
         """
         try:
             if self._close_async is not None and not force:
