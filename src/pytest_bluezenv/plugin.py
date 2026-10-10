@@ -81,14 +81,14 @@ def pytest_addoption(parser):
     group.addoption(
         "--bluezenv-progress",
         action="store",
-        choices=("auto", "on", "off"),
+        choices=("auto", "on", "off", "yes", "no"),
         default=None,
-        help="Show progress for slow RPC calls (default: auto on an interactive terminal)",
+        help="Show progress for slow RPC calls (default: off)",
     )
     parser.addini(
         "bluezenv_progress",
         "Show progress for slow RPC calls (auto/on/off)",
-        default="auto",
+        default="off",
     )
     group.addoption(
         "--usb",
