@@ -61,7 +61,7 @@ class ProgressReporter:
     @classmethod
     def from_config(cls, config, option):
         """Create a reporter for the session, or None when disabled."""
-        if option == "off":
+        if option in ("off", "no") or not option:
             return None
 
         worker = getattr(config, "workerinput", None)
