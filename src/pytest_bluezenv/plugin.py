@@ -648,8 +648,7 @@ def kernel(pytestconfig):
     if not kernel:
         pytest.skip("No kernel image")
 
-    if Path(kernel).is_dir():
-        kernel = str(Path(kernel) / "arch" / "x86" / "boot" / "bzImage")
+    kernel = str(env.Environment.find_kernel(kernel))
 
     if not Path(kernel).is_file():
         pytest.skip("no kernel image")
@@ -804,6 +803,10 @@ def _vm_impl(request, kernel, num_hosts, hw, mem, controller):
         return
 
     if hw or config.option.force_usb or config.option.force_pcie:
+        if env.Environment.is_uml_kernel(kernel):
+            pytest.skip(reason="controller passthrough needs QEMU, not User Mode Linux")
+            return
+
         hw_indices, messages = request.getfixturevalue("hw_indices")
         if len(hw_indices) < num_hosts:
             message = "\n".join(m for m in messages[:num_hosts] if m)
