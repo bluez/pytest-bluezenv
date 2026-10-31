@@ -61,18 +61,6 @@ DEFAULTS_TEST = """
 """
 
 
-@pytest.fixture
-def restore_plugin_state():
-    from pytest_bluezenv import env, utils
-
-    original = (utils.DEFAULT_TIMEOUT, env.Environment.DEFAULT_MEM)
-    yield
-    # The inner run configures these globals; the outer session must
-    # keep its own values.
-    utils.DEFAULT_TIMEOUT, env.Environment.DEFAULT_MEM = original
-
-
-@pytest.mark.usefixtures("restore_plugin_state")
 def test_vm_timeout_option_sets_default_timeout(pytester):
     pytester.makepyfile(DEFAULTS_TEST.format(timeout=7.5, mem=repr("512M")))
     pytester.runpytest(
@@ -80,7 +68,6 @@ def test_vm_timeout_option_sets_default_timeout(pytester):
     ).assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("restore_plugin_state")
 def test_vm_timeout_ini_sets_default_timeout(pytester):
     pytester.makeini("[pytest]\nvm_timeout = 42\n")
     pytester.makepyfile(DEFAULTS_TEST.format(timeout=42, mem=repr("512M")))

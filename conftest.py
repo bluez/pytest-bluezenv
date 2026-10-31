@@ -86,3 +86,18 @@ def pkg_bin_dir():
         / "build"
         / f"cp{sys.version_info.major}{sys.version_info.minor}"
     )
+
+
+@pytest.fixture(autouse=True)
+def restore_plugin_state():
+    """
+    Keep plugin globals from leaking between tests: an in-process
+    pytester session runs the plugin's pytest_configure, overwriting
+    utils.DEFAULT_TIMEOUT and Environment.DEFAULT_MEM for the outer
+    session.
+    """
+    from pytest_bluezenv import env, utils
+
+    original = (utils.DEFAULT_TIMEOUT, env.Environment.DEFAULT_MEM)
+    yield
+    utils.DEFAULT_TIMEOUT, env.Environment.DEFAULT_MEM = original
