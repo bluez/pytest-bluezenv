@@ -538,6 +538,18 @@ def _main_runner_instance():
         log.info(f"Test RPC server quit")
 
 
+def _is_uml_guest():
+    """
+    Whether running as a User Mode Linux guest: test-runner marks the
+    kernel command line of its UML guests with TESTUML=1.
+    """
+    try:
+        with open("/proc/cmdline") as f:
+            return "TESTUML=1" in f.read().split()
+    except OSError:
+        return False
+
+
 def _setup_vm_instance():
     # Mount shared path
     path = Path("/run/shared")
@@ -581,7 +593,13 @@ def _setup_vm_instance():
         log.warning("setsid not available")
         setsid = None
 
-    if exe is not None and setsid is not None and Path("/dev/ttyS1").exists():
+    # User Mode Linux registers phantom /dev/ttyS0..63 host pty devices
+    if (
+        exe is not None
+        and setsid is not None
+        and not _is_uml_guest()
+        and Path("/dev/ttyS1").exists()
+    ):
         # Use shell script for restarting getty: uses less memory than Python
         script = Path("/tmp/getty.script")
         with open(script, "w") as f:
