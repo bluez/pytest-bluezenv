@@ -119,7 +119,7 @@ class HostProxy:
                host.bluetoothctl.send("show\\n")
     """
 
-    def __init__(self, path, timeout, name, progress_reporter=None):
+    def __init__(self, path, timeout, name, progress_reporter=None, check_errors=None):
         """
         Create a VM-host proxy.
 
@@ -128,6 +128,8 @@ class HostProxy:
             timeout (float): default RPC timeout in seconds.
             name (str): VM-host logger name.
             progress_reporter: optional progress reporter for RPC calls.
+            check_errors: optional callable raising when the VM host
+                cannot come up anymore, e.g. its process died.
         """
         self._path = path
         self._active_conn = None
@@ -135,6 +137,7 @@ class HostProxy:
         self._plugins = {}
         self._name = name
         self._progress_reporter = progress_reporter
+        self._check_errors = check_errors
 
     def load(self, plugin: HostPlugin):
         """
@@ -189,7 +192,10 @@ class HostProxy:
     def _conn(self):
         if self._active_conn is None:
             self._active_conn = rpc.client_unix_socket(
-                self._path, timeout=self._timeout, name=self._name
+                self._path,
+                timeout=self._timeout,
+                name=self._name,
+                check=self._check_errors,
             )
         return self._active_conn
 
@@ -850,6 +856,11 @@ class Environment:
 
         return errors
 
+    def _raise_job_errors(self):
+        errors = self.check_job_errors()
+        if errors:
+            raise RuntimeError("\n".join(errors))
+
     def close_hosts(self):
         try:
             for h in self.hosts:
@@ -1241,6 +1252,7 @@ class Environment:
                 timeout=self.timeout,
                 name=name,
                 progress_reporter=self.progress_reporter,
+                check_errors=self._raise_job_errors,
             )
             self.hosts.append(host)
 
