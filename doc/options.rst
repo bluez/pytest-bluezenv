@@ -7,7 +7,8 @@ Command line
 The pytest-bluezenv plugin adds the following options.
 
 ``--kernel=<image>``
-    Kernel image or built Linux source-tree root. When omitted,
+    Kernel image, User Mode Linux binary, or built Linux source-tree
+    root. When omitted,
     ``FUNCTIONAL_TESTING_KERNEL`` supplies the value.
 
 ``--usb=hci0,hci1``

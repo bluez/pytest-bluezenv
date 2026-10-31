@@ -60,3 +60,48 @@ def test_remote_error_shows_original_exception_and_traceback():
     assert "Remote traceback:" in str(err)
     assert err.exc is exc
     assert err.traceback.startswith("Traceback")
+
+
+def test_client_retries_after_connection_reset(tmp_path):
+    """
+    A server closing the first connection with the handshake unread resets
+    it: the client must retry and complete a call on the next one.
+    """
+    import select
+    import socket
+
+    socket_path = tmp_path / "socket"
+    results, errors = [], []
+
+    def serve():
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.bind(str(socket_path))
+                sock.listen(1)
+                # Don't outlive a client that gave up
+                sock.settimeout(10)
+
+                # Close with the hello unread, which resets the connection
+                s, _ = sock.accept()
+                select.select([s], [], [], 10)
+                s.close()
+
+                s, _ = sock.accept()
+                try:
+                    results.append(rpc.server_stream(s, lambda text: f"got {text}"))
+                finally:
+                    s.close()
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+
+    try:
+        with rpc.client_unix_socket(socket_path, timeout=10) as conn:
+            assert conn.call("__call__", "hello") == "got hello"
+    finally:
+        thread.join(timeout=10)
+        assert not thread.is_alive()
+
+    assert errors == []

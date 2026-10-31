@@ -186,7 +186,7 @@ def client_unix_socket(socket_path, timeout=10, name=None):
     """
     log.debug(f"client: connect")
 
-    wait = 0.5
+    wait = 0.25
     end = time.time() + timeout
     while True:
         dt = end - time.time()
@@ -206,7 +206,7 @@ def client_unix_socket(socket_path, timeout=10, name=None):
         try:
             conn._send_reply("hello", timeout=min(wait, dt))
             break
-        except (BrokenPipeError, TimeoutError) as exc:
+        except (BrokenPipeError, ConnectionResetError, TimeoutError) as exc:
             log.debug(f"client: retry connect ({exc})")
             sock.close()
             conn = None

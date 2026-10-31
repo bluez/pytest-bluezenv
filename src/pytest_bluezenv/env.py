@@ -9,13 +9,13 @@ Test environment:
 
 """
 
+import struct
 import sys
 import os
 import signal
 import re
 import pwd
 import time
-import shlex
 import argparse
 import shutil
 import glob
@@ -439,17 +439,28 @@ def _wait_core_dumps():
     subprocess.run(["sync"])
 
 
-def _find_vport(target_name):
+def _find_vport(target_name, timeout=10):
     """
-    Find RPC control virtio port
+    Find RPC control virtio port. Ports may appear after boot, e.g. when
+    the device announces them at a later simulated time.
     """
-    for port in Path("/sys/class/virtio-ports").iterdir():
-        with open(port / "name", "rb") as f:
-            name = f.read(64)
+    end = time.monotonic() + timeout
+
+    while True:
+        ports = Path("/sys/class/virtio-ports")
+        for port in ports.iterdir() if ports.is_dir() else ():
+            try:
+                with open(port / "name", "rb") as f:
+                    name = f.read(64)
+            except OSError:
+                continue
             if name == target_name:
                 return f"/dev/{port.name}"
 
-    raise RuntimeError(f"No virtio port {target_name} found")
+        if time.monotonic() > end:
+            raise RuntimeError(f"No virtio port {target_name} found")
+
+        time.sleep(0.05)
 
 
 class _RunnerLogHandler(logging.Handler):
@@ -564,7 +575,7 @@ def _setup_vm_instance():
         log.warning("setsid not available")
         setsid = None
 
-    if exe is not None and setsid is not None:
+    if exe is not None and setsid is not None and Path("/dev/ttyS1").exists():
         # Use shell script for restarting getty: uses less memory than Python
         script = Path("/tmp/getty.script")
         with open(script, "w") as f:
@@ -682,16 +693,16 @@ class Environment:
         btvirt_debug=False,
         progress_reporter=None,
     ):
-        if Path(kernel).is_dir():
-            self.kernel = str(Path(kernel) / "arch" / "x86" / "boot" / "bzImage")
-        else:
-            self.kernel = str(kernel)
+        self.kernel = str(self.find_kernel(kernel))
+        # A User Mode Linux kernel is an executable (ELF), not a bzImage
+        self.uml = self.is_uml_kernel(self.kernel)
 
         if not mem and self.DEFAULT_MEM:
             mem = self.DEFAULT_MEM
 
         self.num_hosts = operator.index(num_hosts)
         self.jobs = []
+        self.kill_jobs = set()
         self.log_streams = []
         self.hosts = []
         self.timeout = float(timeout)
@@ -718,8 +729,68 @@ class Environment:
             self.runner = [sys.executable]
         self.runner += [str((Path(__file__).parent / "runner.py").absolute())]
 
+    @staticmethod
+    def find_kernel(kernel):
+        """
+        Kernel image to use: given file, or the bzImage or (User Mode Linux)
+        linux binary of a built kernel tree.
+        """
+        path = Path(kernel)
+        if not path.is_dir():
+            return path
+
+        bzimage = path / "arch" / "x86" / "boot" / "bzImage"
+        if not bzimage.exists() and Environment.is_uml_kernel(path / "linux"):
+            return path / "linux"
+
+        return bzimage
+
+    @staticmethod
+    def is_uml_kernel(kernel):
+        """
+        Whether the kernel is a User Mode Linux binary: an ELF executable
+        with the .uml.setup.init section, as test-runner checks, unlike
+        e.g. a vmlinux that QEMU can boot.
+        """
+        try:
+            with open(kernel, "rb") as f:
+                hdr = f.read(64)
+                # 64-bit little-endian ELF, as built for x86_64
+                if hdr[:6] != b"\x7fELF\x02\x01":
+                    return False
+
+                (shoff,) = struct.unpack_from("<Q", hdr, 0x28)
+                shentsize, shnum, shstrndx = struct.unpack_from("<HHH", hdr, 0x3A)
+
+                f.seek(shoff)
+                shdrs = f.read(shnum * shentsize)
+                strtab, strsize = struct.unpack_from(
+                    "<QQ", shdrs, shstrndx * shentsize + 0x18
+                )
+
+                f.seek(strtab)
+                names = f.read(strsize)
+        except (OSError, struct.error):
+            return False
+
+        for i in range(shnum):
+            (name,) = struct.unpack_from("<I", shdrs, i * shentsize)
+            if names[name:].split(b"\0", 1)[0] == b".uml.setup.init":
+                return True
+
+        return False
+
     def start(self):
         self.path = Path(tempfile.mkdtemp(prefix="pytest-bluezenv-"))
+
+        if self.uml:
+            if self.hw_indices is not None:
+                raise ValueError(
+                    "Controller passthrough is not supported with User Mode Linux"
+                )
+            paths, names = self._start_uml()
+            self._start_hosts(paths, names)
+            return
 
         if self.controller:
             if self.hw_indices is None:
@@ -733,15 +804,17 @@ class Environment:
         self._start_hosts(paths, names)
 
     def stop(self):
-        for job in self.jobs:
-            if job.poll() is not None:
-                continue
-            job.terminate()
-
+        # Stop in reverse start order: VM hosts before the btvirt serving
+        # their devices, which User Mode Linux guests do not survive losing
         while self.jobs:
             job = self.jobs.pop()
             if job.poll() is None:
+                if job in self.kill_jobs:
+                    job.kill()
+                else:
+                    job.terminate()
                 job.wait()
+        self.kill_jobs.clear()
 
         while self.log_streams:
             self.log_streams.pop().close()
@@ -756,7 +829,7 @@ class Environment:
         # Clean up tmpdir (btvirt, own sockets, rmdir)
         if self.path is not None:
             for f in list(self.path.iterdir()):
-                if f.name.startswith("bt-server-"):
+                if f.name.startswith(("bt-", "con-")):
                     f.unlink()
                 if f.name.startswith("shared-"):
                     shutil.rmtree(f.resolve(), ignore_errors=True)
@@ -927,6 +1000,119 @@ class Environment:
             args.append(self.check_controller(index))
 
         return args
+
+    def _uml_mem(self):
+        """
+        Memory size for UML's mem=, which takes a plain number as bytes
+        where --vm-mem takes it as MiB, as QEMU does.
+        """
+        mem = str(self.mem or "256M").strip()
+        return f"{mem}M" if mem.isdigit() else mem
+
+    def _start_uml(self):
+        """
+        Start User Mode Linux VM hosts with test-runner, with btvirt serving
+        their controllers and RPC and log channels as vhost-user devices.
+
+        The hosts run on real time: time travel runs the guests in
+        lock-step, one at a time, which makes tests exchanging traffic
+        between hosts slower than real time.
+        """
+        global ENV_INDEX
+
+        ENV_INDEX += 1
+
+        btvirt = utils.find_exe("emulator", "btvirt")
+        logger = self._add_log("btvirt")
+
+        cmd = [btvirt]
+        if self.btvirt_debug:
+            cmd.append("-d")
+        if self.controller:
+            cmd += [f"-V{self.path}"]
+        for idx in range(self.num_hosts):
+            cmd += [
+                f"--console={self.path}/con-{idx}"
+                ":pytest-bluezenv-rpc:pytest-bluezenv-log"
+            ]
+
+        log.info("Starting btvirt: {}".format(utils.quoted(cmd)))
+        job = Popen(
+            cmd, stdout=logger, stderr=logger, stdin=DEVNULL, env=self._get_asan_env()
+        )
+        self.jobs.append(job)
+
+        # Every socket the hosts connect to: btvirt creates the console
+        # relay sockets after the console one, and the controller last
+        files = []
+        for idx in range(self.num_hosts):
+            con = self.path / f"con-{idx}"
+            files += [
+                con,
+                Path(f"{con}-pytest-bluezenv-rpc"),
+                Path(f"{con}-pytest-bluezenv-log"),
+            ]
+        if self.controller:
+            files.append(self.path / "bt-vhost-bredrle")
+        utils.wait_files([job], files)
+
+        test_runner = utils.find_exe("tools", "test-runner")
+        socket_paths = []
+        host_names = []
+
+        for idx in range(self.num_hosts):
+            shared_path = self.path / f"shared-{idx}"
+            shared_path.mkdir()
+
+            with open(shared_path / "defaults", "wb") as f:
+                pickle.dump(
+                    (
+                        sys.path,
+                        utils.SRC_DIR,
+                        utils.BUILD_DIR,
+                        utils.DEFAULT_TIMEOUT * 3 / 4,
+                    ),
+                    f,
+                )
+
+            # Kernel parameters, test-runner passes -o to User Mode Linux
+            con = self.path / f"con-{idx}"
+            params = [
+                f"mem={self._uml_mem()}",
+                f"BLUEZENV_SHARED={shared_path}",
+                f"virtio_uml.device={con}:3",
+            ]
+            if self.controller:
+                params += [f"virtio_uml.device={self.path}/bt-vhost-bredrle:40"]
+
+            cmd = [test_runner, f"--kernel={self.kernel}", "--real-time"]
+            for p in params:
+                cmd += ["-o", p]
+            cmd += ["--"] + self.runner
+
+            log.info("Starting host: {}".format(utils.quoted(cmd)))
+
+            host_names.append(f"host.{ENV_INDEX}.{idx}")
+
+            logger = self._add_log(host_names[-1])
+            job = Popen(cmd, stdout=logger, stderr=logger, stdin=DEVNULL)
+            self.jobs.append(job)
+            # User Mode Linux shuts down on SIGTERM in a context where its
+            # virtio devices cannot be removed, and nothing is lost by
+            # killing it as the runner keeps no state
+            self.kill_jobs.add(job)
+
+            log_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            log_sock.connect(f"{con}-pytest-bluezenv-log")
+            self._add_log(
+                host_names[-1],
+                pattern=".*\x00([^\x00-\x03]+)\x01([^\x00-\x03]+)\x02([^\x00-\x03]+)\x03",
+                stream=log_sock,
+            )
+
+            socket_paths.append(f"{con}-pytest-bluezenv-rpc")
+
+        return socket_paths, host_names
 
     def _start_runners(self, args):
         global ENV_INDEX

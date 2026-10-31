@@ -6,7 +6,7 @@ General
 
 pytest-bluezenv requires:
 
-- QEMU for x86_64
+- QEMU for x86_64, unless using a User Mode Linux kernel
 - ``dbus-daemon``
 - The Python dependencies declared by the package
 
@@ -52,6 +52,32 @@ For accurate VM-host log timestamps, the kernel needs these options:
 	CONFIG_PTP_1588_CLOCK=y
 	CONFIG_PTP_1588_CLOCK_KVM=y
 	CONFIG_PTP_1588_CLOCK_VMCLOCK=y
+
+User Mode Linux
+---------------
+
+A User Mode Linux (UML) kernel can be used instead of QEMU, e.g. on
+machines without KVM support. The VM hosts are then run as UML processes
+by ``test-runner``, with a single ``btvirt`` serving their controllers and
+control and log channels as vhost-user devices. Controller pass-through is
+not available. The kernel is built with ``ARCH=um`` from the same
+configuration, with in addition:
+
+.. code-block::
+
+	CONFIG_HOSTFS=y
+	CONFIG_VIRTIO_UML=y
+
+.. code-block::
+
+	make ARCH=um defconfig
+	scripts/kconfig/merge_config.sh -m .config ../bluez/doc/tester.config
+	scripts/config -e HOSTFS -e VIRTIO_UML
+	make ARCH=um olddefconfig linux
+
+and passed with ``--kernel=<linux>``, or the tree root. The hosts run on
+real time: UML time travel runs the guests in lock-step, which makes
+tests exchanging traffic between hosts slower.
 
 USB
 ---

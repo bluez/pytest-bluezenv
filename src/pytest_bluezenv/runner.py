@@ -1,6 +1,8 @@
 #!/usr/bin/python3 -P
 # -*- coding: utf-8; mode: python; eval: (blacken-mode); -*-
 # SPDX-License-Identifier: GPL-2.0-or-later
+import ctypes
+import os
 import sys
 import pickle
 from pathlib import Path
@@ -17,10 +19,20 @@ class SelfImport(PathFinder):
 
 sys.meta_path.insert(0, SelfImport())
 
-# Mount /run/shared
+# Mount /run/shared: 9p for QEMU, hostfs for User Mode Linux
 path = Path("/run/shared")
 path.mkdir()
-run(["mount", "-t", "9p", "/dev/shared", str(path)], check=True)
+shared = os.environ.get("BLUEZENV_SHARED")
+if shared:
+    # mount(2) directly: hostfs takes the host directory as raw data with
+    # it, while mount(8) passes options through the new mount API or
+    # mount(2) depending on its version, which hostfs parse differently
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.mount(b"none", bytes(path), b"hostfs", 0, shared.encode()) < 0:
+        err = ctypes.get_errno()
+        raise OSError(err, f"Failed to mount {shared}: {os.strerror(err)}")
+else:
+    run(["mount", "-t", "9p", "/dev/shared", str(path)], check=True)
 
 # Early setup sys.path
 with open("/run/shared/defaults", "rb") as f:
