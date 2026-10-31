@@ -788,6 +788,8 @@ class Environment:
 
                 f.seek(shoff)
                 shdrs = f.read(shnum * shentsize)
+                if shentsize < 4 or len(shdrs) < shnum * shentsize:
+                    return False
                 strtab, strsize = struct.unpack_from(
                     "<QQ", shdrs, shstrndx * shentsize + 0x18
                 )

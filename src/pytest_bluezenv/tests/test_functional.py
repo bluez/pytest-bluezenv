@@ -235,3 +235,26 @@ def test_uml_kernel_detection(tmp_path):
     assert not Environment.is_uml_kernel(tmp_path / "vmlinux")
     assert not Environment.is_uml_kernel(tmp_path / "bzImage")
     assert not Environment.is_uml_kernel(tmp_path / "missing")
+
+
+def test_uml_kernel_detection_truncated_sections(tmp_path):
+    # e_shnum larger than the written section headers: detection must
+    # report "not a User Mode Linux kernel" instead of raising
+    # struct.error or finding a section that is not there
+    import struct
+
+    from pytest_bluezenv.env import Environment
+
+    for name, sections in (
+        ("uml", [".text", ".uml.setup.init"]),
+        ("vmlinux", [".text", ".data"]),
+    ):
+        path = tmp_path / name
+        _elf(path, sections)
+
+        data = bytearray(path.read_bytes())
+        (shnum,) = struct.unpack_from("<H", data, 0x3C)
+        struct.pack_into("<H", data, 0x3C, shnum + 4)
+        path.write_bytes(data)
+
+        assert not Environment.is_uml_kernel(path)
