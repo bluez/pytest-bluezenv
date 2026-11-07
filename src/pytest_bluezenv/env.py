@@ -119,7 +119,7 @@ class HostProxy:
                host.bluetoothctl.send("show\\n")
     """
 
-    def __init__(self, path, timeout, name, progress_reporter=None):
+    def __init__(self, path, timeout, name, progress_reporter=None, check_errors=None):
         """
         Create a VM-host proxy.
 
@@ -128,6 +128,8 @@ class HostProxy:
             timeout (float): default RPC timeout in seconds.
             name (str): VM-host logger name.
             progress_reporter: optional progress reporter for RPC calls.
+            check_errors: optional callable raising when the VM host
+                cannot come up anymore, e.g. its process died.
         """
         self._path = path
         self._active_conn = None
@@ -135,6 +137,7 @@ class HostProxy:
         self._plugins = {}
         self._name = name
         self._progress_reporter = progress_reporter
+        self._check_errors = check_errors
 
     def load(self, plugin: HostPlugin):
         """
@@ -189,7 +192,10 @@ class HostProxy:
     def _conn(self):
         if self._active_conn is None:
             self._active_conn = rpc.client_unix_socket(
-                self._path, timeout=self._timeout, name=self._name
+                self._path,
+                timeout=self._timeout,
+                name=self._name,
+                check=self._check_errors,
             )
         return self._active_conn
 
@@ -532,6 +538,18 @@ def _main_runner_instance():
         log.info(f"Test RPC server quit")
 
 
+def _is_uml_guest():
+    """
+    Whether running as a User Mode Linux guest: test-runner marks the
+    kernel command line of its UML guests with TESTUML=1.
+    """
+    try:
+        with open("/proc/cmdline") as f:
+            return "TESTUML=1" in f.read().split()
+    except OSError:
+        return False
+
+
 def _setup_vm_instance():
     # Mount shared path
     path = Path("/run/shared")
@@ -575,7 +593,13 @@ def _setup_vm_instance():
         log.warning("setsid not available")
         setsid = None
 
-    if exe is not None and setsid is not None and Path("/dev/ttyS1").exists():
+    # User Mode Linux registers phantom /dev/ttyS0..63 host pty devices
+    if (
+        exe is not None
+        and setsid is not None
+        and not _is_uml_guest()
+        and Path("/dev/ttyS1").exists()
+    ):
         # Use shell script for restarting getty: uses less memory than Python
         script = Path("/tmp/getty.script")
         with open(script, "w") as f:
@@ -764,6 +788,8 @@ class Environment:
 
                 f.seek(shoff)
                 shdrs = f.read(shnum * shentsize)
+                if shentsize < 4 or len(shdrs) < shnum * shentsize:
+                    return False
                 strtab, strsize = struct.unpack_from(
                     "<QQ", shdrs, shstrndx * shentsize + 0x18
                 )
@@ -849,6 +875,11 @@ class Environment:
                 errors.append("'{}' terminated unexpectedly".format(cmd))
 
         return errors
+
+    def _raise_job_errors(self):
+        errors = self.check_job_errors()
+        if errors:
+            raise RuntimeError("\n".join(errors))
 
     def close_hosts(self):
         try:
@@ -1241,6 +1272,7 @@ class Environment:
                 timeout=self.timeout,
                 name=name,
                 progress_reporter=self.progress_reporter,
+                check_errors=self._raise_job_errors,
             )
             self.hosts.append(host)
 

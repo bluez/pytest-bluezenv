@@ -105,3 +105,25 @@ def test_client_retries_after_connection_reset(tmp_path):
         assert not thread.is_alive()
 
     assert errors == []
+
+
+def test_client_unix_socket_aborts_when_check_raises(tmp_path):
+    """
+    check is consulted before every attempt, so the client gives up as
+    soon as the host is known dead instead of waiting out the timeout.
+    """
+    import time
+
+    calls = []
+
+    def check():
+        calls.append(1)
+        if len(calls) > 1:
+            raise RuntimeError("host terminated")
+
+    start = time.time()
+    with pytest.raises(RuntimeError, match="host terminated"):
+        rpc.client_unix_socket(tmp_path / "missing-socket", timeout=30, check=check)
+
+    assert len(calls) >= 2
+    assert time.time() - start < 15

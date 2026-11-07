@@ -167,7 +167,7 @@ def server_unix_socket(socket_path, implementation):
             s.close()
 
 
-def client_unix_socket(socket_path, timeout=10, name=None):
+def client_unix_socket(socket_path, timeout=10, name=None, check=None):
     """
     Connect client to Unix socket
 
@@ -175,8 +175,10 @@ def client_unix_socket(socket_path, timeout=10, name=None):
     ----------
     socket_path : str
         Path to Unix socket to bind to and listen
-    proxy_cls : type
-        Proxy class to make instance of
+    check : callable
+        Optional, called before each connect attempt; it may raise to
+        stop retrying, e.g. when the process serving the socket has
+        died and no connection could succeed anymore.
 
     Returns
     -------
@@ -189,6 +191,9 @@ def client_unix_socket(socket_path, timeout=10, name=None):
     wait = 0.25
     end = time.time() + timeout
     while True:
+        if check is not None:
+            check()
+
         dt = end - time.time()
         if dt <= 0:
             raise RemoteTimeoutError("Failed to establish connection")
