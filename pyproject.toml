@@ -29,8 +29,8 @@ license-files = ["LICENSE.txt", "subprojects/bluez/COPYING", "subprojects/bluez/
 dynamic = ["version"]
 
 [project.urls]
-homepage = "https://github.com/pv/pytest-bluezenv"
-documentation = "https://pv.github.io/pytest-bluezenv/"
+Homepage = "https://github.com/bluez/pytest-bluezenv"
+Documentation = "https://bluez.github.io/pytest-bluezenv/"
 
 [project.optional-dependencies]
 docs = ["Sphinx", "pydata-sphinx-theme"]

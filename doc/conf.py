@@ -85,18 +85,18 @@ def linkcode_resolve(domain, info):
         fn = "src/" + fn
         m = re.match(r"^.*dev\d+\+([a-f0-9]+)$", release)
         if m:
-            return "https://github.com/pv/pytest-bluezenv/blob/%s/%s%s" % (
+            return "https://github.com/bluez/pytest-bluezenv/blob/%s/%s%s" % (
                 m.group(1),
                 fn,
                 linespec,
             )
         elif "dev" in release:
-            return "https://github.com/pv/pytest-bluezenv/blob/main/%s%s" % (
+            return "https://github.com/bluez/pytest-bluezenv/blob/main/%s%s" % (
                 fn,
                 linespec,
             )
         else:
-            return "https://github.com/pv/pytest-bluezenv/blob/v%s/%s%s" % (
+            return "https://github.com/bluez/pytest-bluezenv/blob/v%s/%s%s" % (
                 release,
                 fn,
                 linespec,
